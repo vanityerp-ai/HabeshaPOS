@@ -735,13 +735,21 @@ export function NewAppointmentDialogV2({
 
       // Call the callback with the new appointment
       if (onAppointmentCreated) {
-        onAppointmentCreated(newAppointment)
+        await onAppointmentCreated(newAppointment)
       }
+
+      // Trigger immediate refresh of appointments
+      window.dispatchEvent(new CustomEvent('refresh-appointments'))
 
       // Trigger real-time client updates if a client was auto-registered
       if (formData.phone && formData.clientName) {
         window.dispatchEvent(new CustomEvent('refresh-clients'))
       }
+
+      toast({
+        title: "Appointment created",
+        description: `Appointment for ${formData.clientName} has been created successfully.`,
+      })
 
       // Create a new form data object for reset
       const resetFormData = {

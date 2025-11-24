@@ -241,6 +241,18 @@ export default function AppointmentsPage() {
     loadAppointments();
   }, []);
 
+  // Listen for immediate refresh requests
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log("🔄 Immediate appointment refresh requested");
+      invalidateAppointmentsCache();
+      loadAppointments();
+    };
+
+    window.addEventListener('refresh-appointments', handleRefresh);
+    return () => window.removeEventListener('refresh-appointments', handleRefresh);
+  }, []);
+
   // Set up real-time sync for appointments
   useEntityChanges('Appointment', (change) => {
     console.log("🔄 Appointment change detected:", change);
