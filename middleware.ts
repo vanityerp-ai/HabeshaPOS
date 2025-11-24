@@ -1,6 +1,5 @@
-import { auth } from '@/auth';
-import { NextRequest, NextResponse } from "next/server"
-
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
 // Security headers configuration
 const securityHeaders = {
@@ -70,7 +69,21 @@ function detectSuspiciousActivity(req: NextRequest): boolean {
   return false
 }
 
-export { auth as middleware } from "./auth"
+// Simplified middleware - only handles security headers
+// Authentication is handled by NextAuth in the auth.ts file
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Check for suspicious activity
+  if (detectSuspiciousActivity(request)) {
+    console.warn(`Suspicious activity detected: ${pathname}`)
+    return new NextResponse('Forbidden', { status: 403 })
+  }
+
+  // Continue with the request and add security headers
+  const response = NextResponse.next()
+  return addSecurityHeaders(response)
+}
 
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)" ],

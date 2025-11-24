@@ -11,6 +11,7 @@ import { ServiceCategories } from "@/components/services/service-categories"
 import { NewServiceDialog } from "@/components/services/new-service-dialog"
 import { NewCategoryDialog } from "@/components/services/new-category-dialog"
 import { LocationUpdateNotification } from "@/components/services/location-update-notification"
+import { AccessDenied } from "@/components/access-denied"
 import { Plus, Search } from "lucide-react"
 
 export default function ServicesPage() {
@@ -19,6 +20,16 @@ export default function ServicesPage() {
   const [search, setSearch] = useState("")
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+
+  // Check if user has permission to view services page
+  if (!hasPermission("view_services")) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the services management page."
+        backButtonHref="/dashboard/appointments"
+      />
+    )
+  }
 
   // Refresh locations when the page loads
   useEffect(() => {

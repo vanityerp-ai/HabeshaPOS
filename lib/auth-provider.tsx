@@ -27,6 +27,7 @@ export interface AuthContextType {
   hasPermission: (permission: string) => boolean
   hasAnyPermission: (permissions: string[]) => boolean
   getUserPermissions: () => string[]
+  getFirstAccessiblePage: () => string
   canAccessLocation: (locationId: string) => boolean
   canAccessStaffData: (staffId: string) => boolean
   canAccessClientData: (clientId: string) => boolean
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
   hasPermission: () => false,
   hasAnyPermission: () => false,
   getUserPermissions: () => [],
+  getFirstAccessiblePage: () => "/dashboard",
   canAccessLocation: () => false,
   canAccessStaffData: () => false,
   canAccessClientData: () => false,
@@ -178,31 +180,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getUserPermissions = (): string[] => {
     if (!user) return []
 
-    // Get role permissions from our constants
-    const roleKey = user.role.toUpperCase() as keyof typeof ROLE_PERMISSIONS
-    const permissions = ROLE_PERMISSIONS[roleKey] || []
+    // Admin and Super Admin always have ALL permissions
+    const roleUpper = user.role.toUpperCase()
+    if (roleUpper === 'ADMIN' || roleUpper === 'SUPER_ADMIN') {
+      console.log(`✅ Admin/Super Admin detected - granting ALL permissions`)
+      return [PERMISSIONS.ALL]
+    }
 
-    // Get custom permissions from settings if they exist
+    // First, try to get custom permissions from settings
     const storedRoles = SettingsStorage.getRoles()
-    const userRole = storedRoles.find(role => role.id === user.role)
 
-    if (userRole && userRole.permissions) {
+    // Try exact match first
+    let userRole = storedRoles.find(role => role.id === user.role)
+
+    // If no exact match, try case-insensitive match
+    if (!userRole) {
+      userRole = storedRoles.find(role => role.id.toLowerCase() === user.role.toLowerCase())
+    }
+
+    if (userRole && userRole.permissions && userRole.permissions.length > 0) {
       // If the role has custom permissions defined in settings, use those
+      console.log(`✅ Using custom permissions for role "${user.role}":`, userRole.permissions)
       return userRole.permissions
     }
 
-    // Otherwise use the default permissions for the role
+    // Otherwise, fall back to default permissions from constants
+    const roleKey = user.role.toUpperCase() as keyof typeof ROLE_PERMISSIONS
+    const permissions = ROLE_PERMISSIONS[roleKey] || []
+
+    console.log(`⚠️ Using default permissions for role "${user.role}":`, permissions)
     return permissions
   }
 
   // Check if user has a specific permission
   const hasPermission = (permission: string): boolean => {
     if (!user) return false
-
-    // Special case for Receptionist role and POS access
-    if (user.role === 'receptionist' && permission === PERMISSIONS.VIEW_POS) {
-      return true
-    }
 
     const permissions = getUserPermissions()
 
@@ -226,11 +238,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasAnyPermission = (permissionList: string[]): boolean => {
     if (!user) return false
 
-    // Special case for Receptionist role and POS access
-    if (user.role === 'receptionist' && permissionList.includes(PERMISSIONS.VIEW_POS)) {
-      return true
-    }
-
     const permissions = getUserPermissions()
 
     // If user has ALL permission, they have access to everything
@@ -238,17 +245,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true
     }
 
-    // Log permissions for debugging
-    if (permissionList.includes(PERMISSIONS.VIEW_POS)) {
-      console.log("Checking POS permissions:")
-      console.log("User role:", user.role)
-      console.log("User permissions:", permissions)
-      console.log("Required permissions:", permissionList)
-      console.log("Has VIEW_POS:", permissions.includes(PERMISSIONS.VIEW_POS))
-    }
-
     // Check if the user has any of the permissions
     return permissionList.some(permission => permissions.includes(permission))
+  }
+
+  // Get the first accessible page for the user based on their permissions
+  const getFirstAccessiblePage = (): string => {
+    if (!user) return "/login"
+
+    const permissions = getUserPermissions()
+
+    // Priority order for redirection
+    const pageChecks = [
+      { path: "/dashboard", permission: PERMISSIONS.VIEW_DASHBOARD },
+      { path: "/dashboard/appointments", permissions: [PERMISSIONS.VIEW_APPOINTMENTS, PERMISSIONS.VIEW_OWN_APPOINTMENTS] },
+      { path: "/dashboard/clients", permission: PERMISSIONS.VIEW_CLIENTS },
+      { path: "/dashboard/services", permission: PERMISSIONS.VIEW_SERVICES },
+      { path: "/dashboard/pos", permission: PERMISSIONS.VIEW_POS },
+      { path: "/dashboard/inventory", permission: PERMISSIONS.VIEW_INVENTORY },
+      { path: "/dashboard/staff", permission: PERMISSIONS.VIEW_STAFF },
+      { path: "/dashboard/accounting", permission: PERMISSIONS.VIEW_ACCOUNTING },
+      { path: "/dashboard/hr", permission: PERMISSIONS.VIEW_HR },
+      { path: "/dashboard/reports", permission: PERMISSIONS.VIEW_REPORTS },
+      { path: "/dashboard/settings", permission: PERMISSIONS.VIEW_SETTINGS },
+    ]
+
+    for (const check of pageChecks) {
+      if ('permissions' in check) {
+        // Check if user has any of the permissions
+        if (check.permissions.some(p => permissions.includes(p) || permissions.includes(PERMISSIONS.ALL))) {
+          return check.path
+        }
+      } else if ('permission' in check) {
+        // Check if user has the specific permission
+        if (permissions.includes(check.permission) || permissions.includes(PERMISSIONS.ALL)) {
+          return check.path
+        }
+      }
+    }
+
+    // Fallback to appointments if no other page is accessible
+    return "/dashboard/appointments"
   }
 
   // Check if user can access a specific location
@@ -328,6 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasPermission,
         hasAnyPermission,
         getUserPermissions,
+        getFirstAccessiblePage,
         canAccessLocation,
         canAccessStaffData,
         canAccessClientData,

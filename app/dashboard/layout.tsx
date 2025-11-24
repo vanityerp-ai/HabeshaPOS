@@ -31,9 +31,11 @@ export default function DashboardLayout({
 
   // Memoize the logo component to prevent re-renders
   const logoComponent = useMemo(() => {
-    if (user?.role === "STAFF") {
+    // Admin and Super Admin always get dashboard link
+    const roleUpper = user?.role?.toUpperCase()
+    if (roleUpper === "ADMIN" || roleUpper === "SUPER_ADMIN") {
       return (
-        <DashboardLogo href="/dashboard/appointments" className="hidden md:flex" />
+        <DashboardLogo href="/dashboard" className="hidden md:flex" />
       )
     } else if (hasPermission("view_dashboard")) {
       return (

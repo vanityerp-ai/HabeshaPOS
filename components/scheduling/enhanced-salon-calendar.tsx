@@ -58,7 +58,7 @@ export function EnhancedSalonCalendar({
   onAppointmentCreated,
   onAppointmentUpdated,
 }: EnhancedSalonCalendarProps) {
-  const { currentLocation, setCurrentLocation } = useAuth()
+  const { currentLocation, setCurrentLocation, user, hasPermission } = useAuth()
   const { locations, getActiveLocations } = useLocations()
   const { toast } = useToast()
   const [date, setDate] = useState<Date>(selectedDate)
@@ -179,7 +179,62 @@ export function EnhancedSalonCalendar({
     return role !== "ADMIN" && role !== "MANAGER" && role !== "SUPER_ADMIN";
   });
 
+  // Filter staff columns based on permissions
+  // If user only has "view_own_appointments" (not "view_appointments"), show only their column
+  const hasViewAllPermission = hasPermission("view_appointments")
+  const hasViewOwnPermission = hasPermission("view_own_appointments")
 
+  if (!hasViewAllPermission && hasViewOwnPermission && user) {
+    // User can only see their own column
+    console.log(`🔒 Attempting to filter staff columns for user "${user.name}" (ID: ${user.id})`)
+    console.log(`📋 Available staff before filtering:`, locationStaff.map(s => ({ id: s.id, name: s.name })))
+
+    locationStaff = locationStaff.filter(staff => staff.id === user.id)
+
+    console.log(`🔒 After filtering - Staff count: ${locationStaff.length}`)
+
+    // If user is not in the staff list, try to find them in the full staff array
+    if (locationStaff.length === 0) {
+      console.warn(`⚠️ User "${user.name}" not found in locationStaff. Searching in full staff array...`)
+      const userStaff = staff.find(s => s.id === user.id)
+      if (userStaff) {
+        console.log(`✅ Found user in full staff array. Adding to locationStaff.`)
+        locationStaff = [userStaff]
+      } else {
+        console.warn(`⚠️ User "${user.name}" (ID: ${user.id}) not found in staff array. Creating fallback staff object.`)
+
+        // Create a fallback staff object for the current user
+        const fallbackStaff = {
+          id: user.id,
+          name: user.name,
+          email: user.email || '',
+          phone: '',
+          role: user.role,
+          locations: user.locations || [currentLocation],
+          status: 'active',
+          homeService: false,
+          employeeNumber: '',
+          dateOfBirth: '',
+          qidNumber: '',
+          passportNumber: '',
+          qidValidity: '',
+          passportValidity: '',
+          medicalValidity: '',
+          profileImage: '',
+          profileImageType: '',
+          specialties: [],
+          rating: 0,
+          isTopRated: false,
+          availability: 'Available',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        console.log(`✅ Created fallback staff object for user "${user.name}"`)
+        locationStaff = [fallbackStaff]
+      }
+    }
+  }
 
   // Filter by staff filter if active
   const availableStaff = staffFilter
@@ -370,7 +425,17 @@ export function EnhancedSalonCalendar({
 
     const isCorrectStaff = staffFilter === null || appointment.staffId === staffFilter
 
-    return isInRange && isCorrectLocation && isCorrectStaff && isStaffAssignedToLocation
+    // Filter by permission: if user only has "view_own_appointments", show only their appointments
+    const hasViewAllPermission = hasPermission("view_appointments")
+    const hasViewOwnPermission = hasPermission("view_own_appointments")
+
+    let isOwnAppointment = true
+    if (!hasViewAllPermission && hasViewOwnPermission && user) {
+      // User can only see their own appointments
+      isOwnAppointment = appointment.staffId === user.id
+    }
+
+    return isInRange && isCorrectLocation && isCorrectStaff && isStaffAssignedToLocation && isOwnAppointment
   })
 
   // Sort appointments to prioritize original appointments over reflected ones

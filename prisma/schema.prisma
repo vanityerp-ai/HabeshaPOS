@@ -658,6 +658,25 @@ model MembershipTransaction {
 }
 
 // ============================================================================
+// REAL-TIME DATA CHANGE TRACKING
+// ============================================================================
+
+model DataChange {
+  id           String   @id @default(cuid())
+  entityType   String   // Type of entity that changed (User, Product, etc.)
+  entityId     String   // ID of the changed entity
+  changeType   String   // CREATE, UPDATE, DELETE
+  locationId   String?  // Location context for the change
+  userId       String?  // User who made the change
+  timestamp    DateTime @default(now())
+  
+  @@index([timestamp])
+  @@index([entityType, timestamp])
+  @@index([locationId, timestamp])
+  @@map("data_changes")
+}
+
+// ============================================================================
 // AUDIT & LOGGING
 // ============================================================================
 

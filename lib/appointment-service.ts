@@ -65,7 +65,9 @@ export function getAllAppointments(): AppointmentData[] {
   try {
     const storedData = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (storedData) {
-      appointments = JSON.parse(storedData);
+      const parsed = JSON.parse(storedData);
+      // Ensure parsed data is an array
+      appointments = Array.isArray(parsed) ? parsed : [];
       if (DEBUG) console.log('AppointmentService: Loaded from localStorage', appointments.length);
     } else {
       // Initialize with empty array if no data exists

@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
 /**
  * Generate a secure temporary password for staff members
@@ -50,19 +51,20 @@ export function generateUsername(name: string, employeeNumber?: string): string 
 }
 
 /**
- * Simple password hashing (temporary implementation)
- * In production, this should use bcrypt or similar
+ * Hash password using bcrypt
+ * Uses bcryptjs for secure password hashing with salt rounds
  */
 export function hashPassword(password: string): string {
-  // For now, using a simple hash. In production, use bcrypt
-  return crypto.createHash('sha256').update(password + 'vanity_salt').digest('hex')
+  // Use bcrypt with 10 salt rounds for secure hashing
+  const saltRounds = 10
+  return bcrypt.hashSync(password, saltRounds)
 }
 
 /**
- * Compare password with hash
+ * Compare password with hash using bcrypt
  */
 export function comparePassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash
+  return bcrypt.compareSync(password, hash)
 }
 
 /**

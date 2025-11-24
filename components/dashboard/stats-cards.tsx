@@ -110,7 +110,9 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
 
       // Calculate appointment count
       const allAppointments = getAllAppointments()
-      let filteredAppointments = allAppointments
+      // Ensure allAppointments is an array
+      const appointmentsArray = Array.isArray(allAppointments) ? allAppointments : []
+      let filteredAppointments = appointmentsArray
 
       // Filter by location
       if (currentLocation !== 'all') {

@@ -57,13 +57,8 @@ export default function POSPage() {
   console.log("User permissions:", getUserPermissions())
   console.log("Has VIEW_POS permission:", hasPermission("view_pos"))
 
-  // Always allow access for receptionists
-  if (user?.role === "receptionist") {
-    // Receptionist can always access POS
-    console.log("Receptionist role detected - allowing POS access")
-  }
-  // For other roles, check permission
-  else if (!hasPermission("view_pos")) {
+  // Check permission - no special cases
+  if (!hasPermission("view_pos")) {
     console.log("Access denied - user does not have view_pos permission")
     return (
       <AccessDenied
@@ -270,8 +265,8 @@ export default function POSPage() {
       return
     }
 
-    // Special case for receptionists - always allow checkout
-    if (user?.role === "receptionist" || hasPermission("create_sale")) {
+    // Check permission to create sales
+    if (hasPermission("create_sale")) {
       setIsPaymentDialogOpen(true)
     } else {
       toast({

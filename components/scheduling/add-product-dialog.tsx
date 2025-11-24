@@ -25,10 +25,30 @@ export function AddProductDialog({ open, onOpenChange, bookingId, onProductAdded
   const [quantity, setQuantity] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Helper function to normalize category names for comparison
+  // Converts "Skincare" to "SKINCARE", "Hair Care" to "HAIR_CARE", etc.
+  const normalizeCategoryName = (name: string): string => {
+    return name.toUpperCase().replace(/\s+/g, '_')
+  }
+
   // Filter products by selected category (if any)
   const filteredProducts = selectedCategory && selectedCategory !== "all"
-    ? products.filter((p) => p.category === selectedCategory && p.isRetail && p.isActive !== false)
+    ? products.filter((p) => {
+        const normalizedProductCategory = p.category?.toUpperCase().replace(/\s+/g, '_')
+        const normalizedSelectedCategory = normalizeCategoryName(selectedCategory)
+        return normalizedProductCategory === normalizedSelectedCategory && p.isRetail && p.isActive !== false
+      })
     : products.filter((p) => p.isRetail && p.isActive !== false)
+
+  console.log('🔍 AddProductDialog Debug:', {
+    selectedCategory,
+    totalProducts: products.length,
+    retailProducts: products.filter(p => p.isRetail).length,
+    activeRetailProducts: products.filter(p => p.isRetail && p.isActive !== false).length,
+    filteredProducts: filteredProducts.length,
+    categories: categories.map(c => c.name),
+    sampleProduct: products[0]
+  })
 
   const handleSubmit = async () => {
     if (!selectedProduct) {
@@ -114,11 +134,21 @@ export function AddProductDialog({ open, onOpenChange, bookingId, onProductAdded
                 <SelectValue placeholder="Select a product" />
               </SelectTrigger>
               <SelectContent>
-                {filteredProducts.map((product) => (
-                  <SelectItem key={product.id} value={product.id}>
-                    {product.name} - <CurrencyDisplay amount={product.price} showSymbol={true} useLocaleFormat={false} />
-                  </SelectItem>
-                ))}
+                {filteredProducts.length === 0 ? (
+                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    {products.length === 0
+                      ? "No products available. Please add products in the Inventory page."
+                      : selectedCategory && selectedCategory !== "all"
+                      ? `No retail products found in ${selectedCategory} category.`
+                      : "No retail products available."}
+                  </div>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} - <CurrencyDisplay amount={product.price} showSymbol={true} useLocaleFormat={false} />
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

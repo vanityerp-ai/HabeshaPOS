@@ -11,15 +11,26 @@ import { ClientDirectory } from "@/components/clients/client-directory"
 import { ClientSegments } from "@/components/clients/client-segments"
 import { EnhancedClientCommunication } from "@/components/clients/enhanced-client-communication"
 import { EnhancedNewClientDialog } from "@/components/clients/enhanced-new-client-dialog"
+import { AccessDenied } from "@/components/access-denied"
 import { Plus, Search, RefreshCw } from "lucide-react"
 
 export default function ClientsPage() {
-  const { user, currentLocation } = useAuth()
+  const { user, currentLocation, hasPermission } = useAuth()
   const { getLocationName } = useLocations()
   const { clients, refreshClients } = useClients()
   const [search, setSearch] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Check if user has permission to view clients page
+  if (!hasPermission("view_clients")) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the client management page."
+        backButtonHref="/dashboard/appointments"
+      />
+    )
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true)

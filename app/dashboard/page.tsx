@@ -44,7 +44,7 @@ const CardSkeleton = () => (
 )
 
 export default function DashboardPage() {
-  const { hasPermission, user } = useAuth()
+  const { hasPermission, user, getFirstAccessiblePage } = useAuth()
   const router = useRouter()
   const documentAlertCounts = useDocumentAlertCounts()
   const inventoryAlertCounts = useInventoryAlertCounts()
@@ -63,21 +63,18 @@ export default function DashboardPage() {
     setActiveTab(alertType)
   }
 
-  // Redirect staff and receptionists to appointments page
+  // Smart redirect: If user doesn't have dashboard access, redirect to first accessible page
   useEffect(() => {
-    if (user && (user.role === "staff" || user.role === "receptionist")) {
-      router.push("/dashboard/appointments")
+    if (user && !hasPermission("view_dashboard")) {
+      const firstAccessiblePage = getFirstAccessiblePage()
+      console.log(`🔀 User "${user.name}" doesn't have dashboard access. Redirecting to: ${firstAccessiblePage}`)
+      router.push(firstAccessiblePage)
     }
-  }, [user, router])
+  }, [user, hasPermission, getFirstAccessiblePage, router])
 
-  // Check if user has permission to view dashboard page
+  // Don't render anything if user doesn't have permission (will redirect)
   if (!hasPermission("view_dashboard")) {
-    return (
-      <AccessDenied
-        description="You don't have permission to view the dashboard page."
-        backButtonHref="/dashboard/appointments"
-      />
-    )
+    return null
   }
 
   return (

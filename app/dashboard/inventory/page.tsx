@@ -48,6 +48,16 @@ interface ProductLocation {
 
 export default function InventoryPage() {
   const { currentLocation, hasPermission } = useAuth()
+
+  // Check if user has permission to view inventory page
+  if (!hasPermission("view_inventory")) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the inventory management page."
+        backButtonHref="/dashboard/appointments"
+      />
+    )
+  }
   const { formatCurrency } = useCurrency()
   const { products, transfers, getTransferById, cancelTransfer, refreshProducts, isLoading, error } = useProducts()
   const { locations, getLocationById, getLocationName, getActiveLocations } = useLocations()

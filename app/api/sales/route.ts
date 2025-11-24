@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { salesRepository } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { PERMISSIONS } from "@/lib/permissions"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(request: Request) {
   try {
@@ -29,26 +30,31 @@ export async function POST(request: Request) {
     // Get the request data first
     const data = await request.json()
 
-    // Special case for Receptionist role - always allow creating sales
-    if (userRole !== 'receptionist') {
-      // For other roles, check permissions from the database
-      const { query } = await import("@/lib/db")
-      const roleResult = await query(
-        `SELECT permissions FROM roles WHERE id = $1`,
-        [userRole]
-      )
+    // Check permissions from settings storage (custom roles)
+    const { SettingsStorage } = await import("@/lib/settings-storage")
+    const storedRoles = SettingsStorage.getRoles()
 
-      let hasPermission = false
+    // Try to find the user's role (case-insensitive)
+    let userRoleData = storedRoles.find(role => role.id === userRole)
+    if (!userRoleData) {
+      userRoleData = storedRoles.find(role => role.id.toLowerCase() === userRole.toLowerCase())
+    }
 
-      // Check if user has the required permission
-      if (roleResult.rows.length) {
-        const permissions = roleResult.rows[0].permissions
-        hasPermission = permissions.includes(PERMISSIONS.CREATE_SALE) || permissions.includes(PERMISSIONS.ALL)
-      }
+    let hasPermission = false
 
-      if (!hasPermission) {
-        return NextResponse.json({ error: "Permission denied" }, { status: 403 })
-      }
+    // Check if user has the required permission
+    if (userRoleData && userRoleData.permissions) {
+      hasPermission = userRoleData.permissions.includes(PERMISSIONS.CREATE_SALE) || userRoleData.permissions.includes(PERMISSIONS.ALL)
+    } else {
+      // Fallback to default role permissions
+      const { ROLE_PERMISSIONS } = await import("@/lib/permissions")
+      const roleKey = userRole.toUpperCase() as keyof typeof ROLE_PERMISSIONS
+      const defaultPermissions = ROLE_PERMISSIONS[roleKey] || []
+      hasPermission = defaultPermissions.includes(PERMISSIONS.CREATE_SALE) || defaultPermissions.includes(PERMISSIONS.ALL)
+    }
+
+    if (!hasPermission) {
+      return NextResponse.json({ error: "Permission denied - you don't have permission to create sales" }, { status: 403 })
     }
 
     // Validate required fields
@@ -57,7 +63,6 @@ export async function POST(request: Request) {
     }
 
     // Get checkout settings for dynamic tax rate
-    const { SettingsStorage } = await import("@/lib/settings-storage")
     const checkoutSettings = SettingsStorage.getCheckoutSettings()
 
     // Calculate totals
@@ -95,6 +100,54 @@ export async function POST(request: Request) {
         total_amount: item.price * item.quantity * (1 + taxRate) - (item.discountAmount || 0),
       })),
     )
+
+    // Also create a transaction record in Prisma for accounting visibility
+    try {
+      const hasProducts = data.items.some((item: any) => item.type === "product");
+      const hasServices = data.items.some((item: any) => item.type === "service");
+      
+      // Determine transaction type
+      let transactionType = "product_sale";
+      if (hasServices && !hasProducts) {
+        transactionType = "service_sale";
+      } else if (hasServices && hasProducts) {
+        transactionType = "consolidated_sale";
+      }
+
+      // Get location name for reference
+      const location = await prisma.location.findUnique({
+        where: { id: data.locationId },
+        select: { name: true }
+      });
+
+      const locationName = location?.name || data.locationId;
+
+      await prisma.transaction.create({
+        data: {
+          userId: data.staffId,
+          amount: totalAmount,
+          type: transactionType,
+          status: data.paymentStatus === "paid" ? "completed" : data.paymentStatus === "partial" ? "partial" : "pending",
+          method: data.paymentMethod || "cash",
+          reference: `SALE-${sale.id}`,
+          description: `POS Sale - ${data.items.length} item(s)`,
+          locationId: data.locationId,
+          serviceAmount: hasServices ? data.items
+            .filter((item: any) => item.type === "service")
+            .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) : null,
+          productAmount: hasProducts ? data.items
+            .filter((item: any) => item.type === "product")
+            .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) : null,
+          discountAmount: discountAmount || null,
+          items: JSON.stringify(data.items)
+        }
+      });
+      
+      console.log(`✅ Created transaction record for POS sale ${sale.id} at location ${locationName}`);
+    } catch (transactionError) {
+      console.error(`⚠️ Failed to create transaction record for POS sale: ${transactionError}`);
+      // Don't fail the sale creation if transaction recording fails
+    }
 
     return NextResponse.json({
       success: true,

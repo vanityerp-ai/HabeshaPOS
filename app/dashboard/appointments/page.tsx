@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { EnhancedSalonCalendar } from "@/components/scheduling/enhanced-salon-calendar"
 import { EnhancedAppointmentDetailsDialog } from "@/components/scheduling/enhanced-appointment-details-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/lib/auth-provider"
 import { ServiceStorage } from "@/lib/service-storage"
 import { parseISO, format } from "date-fns"
 import { AppointmentStatus } from "@/lib/types/appointment"
@@ -14,10 +15,22 @@ import { Transaction, TransactionType, TransactionSource, TransactionStatus, Pay
 import { ConsolidatedTransactionService } from "@/lib/consolidated-transaction-service"
 import { transactionDeduplicationService } from "@/lib/transaction-deduplication-service"
 import { getCleanClientName } from "@/lib/utils/client-name-utils"
+import { AccessDenied } from "@/components/access-denied"
 
 export default function AppointmentsPage() {
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
   const { addTransaction, transactions } = useTransactions()
+
+  // Check if user has permission to view appointments page
+  if (!hasPermission("view_appointments") && !hasPermission("view_own_appointments")) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the appointments page."
+        backButtonHref="/dashboard"
+      />
+    )
+  }
   const [date, setDate] = useState<Date>(new Date())
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
   const [isAppointmentDetailsDialogOpen, setIsAppointmentDetailsDialogOpen] = useState(false)

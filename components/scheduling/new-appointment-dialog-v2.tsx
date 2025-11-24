@@ -79,7 +79,7 @@ export function NewAppointmentDialogV2({
   const { services, categories, refreshServices, refreshCategories } = useServices()
 
   // Use client provider for auto-registration
-  const { autoRegisterClient, findClientByPhoneAndName } = useClients()
+  const { autoRegisterClient, findClientByPhoneAndName, normalizePhoneNumber, clients } = useClients()
 
   const [formData, setFormData] = useState({
     clientName: "",
@@ -654,11 +654,13 @@ export function NewAppointmentDialogV2({
 
       // Handle client ID - use existing client or auto-register new client
       let clientId = `client-${Date.now()}`
+      let userId = "" // We need the userId for the appointment (Appointment.clientId references User.id)
 
       if (existingClient) {
-        // Use existing client ID
+        // Use existing client's userId for the appointment
         clientId = existingClient.id
-        console.log(`Using existing client: ${existingClient.name} (${existingClient.id})`)
+        userId = existingClient.userId || existingClient.id // Fallback to id if userId not available
+        console.log(`Using existing client: ${existingClient.name} (Client ID: ${clientId}, User ID: ${userId})`)
       } else if (formData.phone && formData.clientName) {
         // Auto-register new client
         const autoRegisteredClient = await autoRegisterClient({
@@ -671,7 +673,8 @@ export function NewAppointmentDialogV2({
 
         if (autoRegisteredClient) {
           clientId = autoRegisteredClient.id
-          console.log(`Auto-registered new client: ${autoRegisteredClient.name} (${autoRegisteredClient.id})`)
+          userId = autoRegisteredClient.userId || autoRegisteredClient.id // Fallback to id if userId not available
+          console.log(`Auto-registered new client: ${autoRegisteredClient.name} (Client ID: ${clientId}, User ID: ${userId})`)
 
           toast({
             title: "New client created",
@@ -683,9 +686,10 @@ export function NewAppointmentDialogV2({
       }
 
       // Create a new appointment object
+      // NOTE: clientId should be the User.id (userId) because Appointment.clientId references User.id in the schema
       const newAppointment = {
         id: `appointment-${Date.now()}`,
-        clientId: clientId,
+        clientId: userId || clientId, // Use userId for appointment (Appointment.clientId references User.id)
         clientName: formData.clientName,
         clientEmail: formData.email, // Store client email for matching
         clientPhone: formData.phone, // Store client phone for matching

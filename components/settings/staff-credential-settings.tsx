@@ -113,6 +113,8 @@ export function StaffCredentialSettings() {
   const [passwordStrength, setPasswordStrength] = useState(0)
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [updatedPassword, setUpdatedPassword] = useState<string | null>(null)
+  const [showUpdatedPassword, setShowUpdatedPassword] = useState(false)
 
   // Fetch staff and locations data
   useEffect(() => {
@@ -321,14 +323,28 @@ export function StaffCredentialSettings() {
 
     try {
       setIsSubmitting(true)
-      await updatePassword(selectedStaff.id, newPassword)
-      setIsEditPasswordDialogOpen(false)
+      // Store the password before clearing it
+      const passwordToSave = newPassword
+      await updatePassword(selectedStaff.id, passwordToSave)
+
+      // Show success with the updated password
+      setUpdatedPassword(passwordToSave)
+      setShowUpdatedPassword(false)
+
+      toast({
+        title: "Password Updated Successfully",
+        description: `Password for ${selectedStaff.name} has been updated. Make sure to save it securely.`,
+      })
+
+      // Don't close the dialog immediately - let user copy the password
+      // Clear the input fields but keep the dialog open to show the updated password
       setNewPassword("")
       setConfirmPassword("")
       setPasswordStrength(0)
       setPasswordErrors([])
     } catch (error) {
       // Error handling is done in the hook
+      setUpdatedPassword(null)
     } finally {
       setIsSubmitting(false)
     }
@@ -1057,7 +1073,20 @@ export function StaffCredentialSettings() {
                 <p className="text-xs text-muted-foreground">
                   {selectedStaff.user?.email}
                 </p>
+                {selectedStaff.user?.updatedAt && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last password update: {new Date(selectedStaff.user.updatedAt).toLocaleDateString()} at {new Date(selectedStaff.user.updatedAt).toLocaleTimeString()}
+                  </p>
+                )}
               </div>
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Security Note:</strong> Passwords are encrypted and cannot be retrieved.
+                  The new password will replace the existing one. Make sure to save it securely.
+                </AlertDescription>
+              </Alert>
 
               <div>
                 <Label htmlFor="new-password">New Password</Label>
@@ -1131,19 +1160,61 @@ export function StaffCredentialSettings() {
               )}
 
               {/* Password Requirements */}
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  <p className="font-medium mb-1">Password Requirements:</p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    <li>At least 8 characters long</li>
-                    <li>At least one uppercase letter</li>
-                    <li>At least one lowercase letter</li>
-                    <li>At least one number</li>
-                    <li>At least one special character</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+              {!updatedPassword && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    <p className="font-medium mb-1">Password Requirements:</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li>At least 8 characters long</li>
+                      <li>At least one uppercase letter</li>
+                      <li>At least one lowercase letter</li>
+                      <li>At least one number</li>
+                      <li>At least one special character</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Show Updated Password */}
+              {updatedPassword && (
+                <Alert className="bg-green-50 border-green-200">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <AlertDescription>
+                    <p className="font-medium text-green-900 mb-2">Password Updated Successfully!</p>
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-xs text-green-800">New Password</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            type={showUpdatedPassword ? "text" : "password"}
+                            value={updatedPassword}
+                            readOnly
+                            className="bg-white font-mono text-sm"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowUpdatedPassword(!showUpdatedPassword)}
+                          >
+                            {showUpdatedPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(updatedPassword, "Password")}
+                          >
+                            {copiedField === "Password" ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-green-800">
+                        ⚠️ Make sure to save this password securely. You won't be able to see it again.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
 
@@ -1156,17 +1227,21 @@ export function StaffCredentialSettings() {
                 setConfirmPassword("")
                 setPasswordStrength(0)
                 setPasswordErrors([])
+                setUpdatedPassword(null)
+                setShowUpdatedPassword(false)
               }}
             >
-              Cancel
+              {updatedPassword ? "Close" : "Cancel"}
             </Button>
-            <Button
-              onClick={handleUpdatePassword}
-              disabled={isSubmitting || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-            >
-              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Update Password
-            </Button>
+            {!updatedPassword && (
+              <Button
+                onClick={handleUpdatePassword}
+                disabled={isSubmitting || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+              >
+                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Password
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

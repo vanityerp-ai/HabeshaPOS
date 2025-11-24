@@ -29,7 +29,7 @@ function truncateDescription(description: string, maxLength: number = 20): strin
 import { format, addDays, subDays, isSameDay } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/lib/transaction-provider"
-import { TransactionType, TransactionStatus, PaymentMethod } from "@/lib/transaction-types"
+import { TransactionType, TransactionStatus, TransactionSource, PaymentMethod } from "@/lib/transaction-types"
 
 interface DailySalesProps {
   dateRange?: DateRange
@@ -66,7 +66,7 @@ export function DailySales({
   const [isExporting, setIsExporting] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
 
-  // Get transactions for the current date
+  // Get transactions for the current date (with Online Store product sales enforced to always appear)
   const dailyTransactions = useMemo(() => {
     const filters: any = {
       singleDate: currentDate

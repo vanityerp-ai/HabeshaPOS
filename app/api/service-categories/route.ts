@@ -1,18 +1,47 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
+// Helper function to retry database operations
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error as Error
+      console.warn(`⚠️ Database operation failed (attempt ${attempt}/${maxRetries}):`, error)
+
+      if (attempt < maxRetries) {
+        console.log(`🔄 Retrying in ${delayMs}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        // Exponential backoff
+        delayMs *= 2
+      }
+    }
+  }
+
+  throw lastError
+}
+
 export async function GET() {
   try {
     console.log("🔄 Fetching service categories...")
 
-    // Get all services and extract unique categories
-    const services = await prisma.service.findMany({
-      where: {
-        isActive: true
-      },
-      select: {
-        category: true
-      }
+    // Get all services and extract unique categories with retry logic
+    const services = await retryOperation(async () => {
+      return await prisma.service.findMany({
+        where: {
+          isActive: true
+        },
+        select: {
+          category: true
+        }
+      })
     })
 
     // Extract unique categories and count services for each
@@ -61,7 +90,24 @@ export async function GET() {
     return NextResponse.json({ categories: uniqueCategories })
   } catch (error) {
     console.error("❌ Error fetching service categories:", error)
-    return NextResponse.json({ error: "Failed to fetch service categories" }, { status: 500 })
+
+    // Check if it's a database connection error
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const isDatabaseError = errorMessage.includes("Can't reach database") ||
+                           errorMessage.includes("P1001")
+
+    if (isDatabaseError) {
+      return NextResponse.json({
+        error: "Database connection failed. Please check your database connection and try again.",
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        code: 'DATABASE_CONNECTION_ERROR'
+      }, { status: 503 }) // Service Unavailable
+    }
+
+    return NextResponse.json({
+      error: "Failed to fetch service categories",
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    }, { status: 500 })
   }
 }
 

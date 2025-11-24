@@ -116,6 +116,8 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     }
   }, [isInitialized]);
 
+
+
   // Function to remove duplicate transactions (legacy - kept for compatibility)
   const removeDuplicateTransactions = (): number => {
     console.log('🧹 Legacy duplicate removal called - using enhanced version');
@@ -374,8 +376,71 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       locationId: newTransaction.location
     });
 
+    // Save transaction to database
+    saveTransactionToDatabase(newTransaction).catch(error => {
+      console.error('❌ Failed to save transaction to database:', error);
+    });
+
     console.log('=== TRANSACTION PROVIDER: Returning transaction ===');
     return newTransaction;
+  };
+
+  // Helper function to save transaction to database
+  const saveTransactionToDatabase = async (transaction: Transaction) => {
+    try {
+      console.log('💾 Saving transaction to database:', transaction.id);
+
+      // Find the client's userId from clientId
+      let userId = transaction.clientId;
+
+      // If clientId is provided but it's a Client.id (not User.id), we need to fetch the userId
+      if (transaction.clientId) {
+        try {
+          const clientResponse = await fetch(`/api/clients/${transaction.clientId}`);
+          if (clientResponse.ok) {
+            const clientData = await clientResponse.json();
+            userId = clientData.userId || transaction.clientId;
+            console.log(`📋 Resolved userId: ${userId} for clientId: ${transaction.clientId}`);
+          }
+        } catch (error) {
+          console.warn('Could not resolve userId from clientId, using clientId as userId');
+        }
+      }
+
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          amount: transaction.amount,
+          type: transaction.type,
+          status: transaction.status,
+          method: transaction.paymentMethod,
+          reference: transaction.reference?.id || null,
+          description: transaction.description || `${transaction.category} - ${transaction.description || ''}`,
+          locationId: transaction.location || null,
+          appointmentId: transaction.reference?.type === 'appointment' ? transaction.reference.id : null,
+          serviceAmount: transaction.type === 'SERVICE_SALE' ? transaction.amount : null,
+          productAmount: transaction.type === 'PRODUCT_SALE' ? transaction.amount : null,
+          originalServiceAmount: transaction.metadata?.originalServiceAmount || null,
+          discountPercentage: transaction.metadata?.discountPercentage || null,
+          discountAmount: transaction.metadata?.discountAmount || null,
+          items: transaction.items || []
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Failed to save transaction to database:', error);
+      } else {
+        const result = await response.json();
+        console.log('✅ Transaction saved to database:', result.transaction?.id);
+      }
+    } catch (error) {
+      console.error('❌ Error saving transaction to database:', error);
+    }
   };
 
   // Update an existing transaction
@@ -440,7 +505,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       clientPortalCount: transactions.filter(tx => tx.source === TransactionSource.CLIENT_PORTAL).length
     });
 
-    const filtered = transactions.filter(tx => {
+    let filtered = transactions.filter(tx => {
       // Convert date strings to Date objects if needed
       const txDate = typeof tx.date === 'string' ? new Date(tx.date) : tx.date;
 
@@ -498,10 +563,12 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       }
 
       // Filter by location with proper handling for online vs physical locations
+      // ENFORCE: Always include Online Store product sales and POS product sales from their respective locations
       if (filter.location && filter.location !== 'all' && tx.location !== filter.location) {
         // Identify online transactions
         const isClientPortalTransaction = tx.source === TransactionSource.CLIENT_PORTAL;
-
+        const isProductSale = tx.type === TransactionType.PRODUCT_SALE || tx.type === TransactionType.CONSOLIDATED_SALE;
+        
         const isOnlineTransaction = tx.location === 'online' ||
                                   tx.location === 'client_portal' ||
                                   tx.metadata?.isOnlineTransaction === true;
@@ -509,6 +576,42 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         const hasNoLocation = !tx.location || tx.location === null || tx.location === undefined;
 
         const isOnlineRelated = isClientPortalTransaction || isOnlineTransaction || hasNoLocation;
+
+        // ENFORCEMENT 1: Always keep Online Store product sales regardless of location filter
+        const isOnlineProductSale = isClientPortalTransaction && isProductSale;
+        
+        if (isOnlineProductSale) {
+          console.log('🔍 ENFORCED: Online Store product sale included in physical location filter:', {
+            transactionId: tx.id,
+            txLocation: tx.location,
+            txSource: tx.source,
+            txType: tx.type,
+            willBeFiltered: false,
+            reason: 'Online Store product sales are always included (enforcement)'
+          });
+          // Keep the transaction - it's an online store product sale that must be recorded
+          return true;
+        }
+
+        // ENFORCEMENT 2: Always keep POS product sales from their actual location
+        const isPosSale = tx.source === TransactionSource.POS || tx.metadata?.isPosSale === true;
+        if (isPosSale && isProductSale && tx.location) {
+          // POS product sales should always be included in their respective location filters
+          console.log('🔍 ENFORCED: POS product sale from location included:', {
+            transactionId: tx.id,
+            txLocation: tx.location,
+            txSource: tx.source,
+            txType: tx.type,
+            filterLocation: filter.location,
+            willBeFiltered: false,
+            reason: 'POS product sales from physical locations are always included (enforcement)'
+          });
+          // Return false here because we need to keep checking - this will be handled by the location match check above
+          // But we should NOT filter out POS sales from their actual location
+          if (tx.location === filter.location) {
+            return true; // Include it - location matches and it's a POS product sale
+          }
+        }
 
         if (isOnlineRelated) {
           // Online transactions should ONLY appear when filtering by "online" location
@@ -624,6 +727,82 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       return 0;
     }
   };
+
+  // Sync POS sales from Prisma to transactions after initialization
+  useEffect(() => {
+    if (isInitialized) {
+      console.log('🔄 TRANSACTION PROVIDER: Running POS sales sync from Prisma');
+      
+      // Run the sync with a delay to ensure everything is loaded
+      setTimeout(async () => {
+        try {
+          const response = await fetch('/api/transactions');
+          if (response.ok) {
+            const data = await response.json();
+            const prismaTransactions = data.transactions || [];
+            
+            // Filter only POS sales that are not already in our provider
+            const existingIds = new Set(transactions.map(tx => tx.id));
+            const posSalesToSync = prismaTransactions.filter((tx: any) => {
+              // Only sync if it's a POS sale (has locationId and reference starts with SALE-)
+              return tx.reference?.startsWith('SALE-') && 
+                     tx.locationId && 
+                     !existingIds.has(tx.id) &&
+                     !transactions.some(existing => existing.reference === tx.reference);
+            });
+            
+            if (posSalesToSync.length > 0) {
+              console.log(`📊 TRANSACTION PROVIDER: Found ${posSalesToSync.length} POS sales to sync from Prisma`);
+              
+              let syncedCount = 0;
+              for (const prismaTx of posSalesToSync) {
+                try {
+                  const convertedTx = {
+                    id: prismaTx.id,
+                    type: prismaTx.type || 'product_sale',
+                    description: prismaTx.description || `POS Sale`,
+                    amount: Number(prismaTx.amount),
+                    date: new Date(prismaTx.createdAt),
+                    status: prismaTx.status?.toLowerCase() || 'completed',
+                    source: 'pos', // Mark as POS source
+                    location: prismaTx.locationId,
+                    reference: prismaTx.reference,
+                    method: prismaTx.method || 'cash',
+                    clientId: undefined,
+                    clientName: undefined,
+                    staffId: prismaTx.userId,
+                    staffName: undefined,
+                    items: prismaTx.items ? JSON.parse(prismaTx.items) : [],
+                    metadata: {
+                      prismaId: prismaTx.id,
+                      serviceAmount: prismaTx.serviceAmount ? Number(prismaTx.serviceAmount) : undefined,
+                      productAmount: prismaTx.productAmount ? Number(prismaTx.productAmount) : undefined,
+                      discountAmount: prismaTx.discountAmount ? Number(prismaTx.discountAmount) : undefined,
+                      isPosSale: true
+                    }
+                  };
+                  
+                  const added = addTransaction(convertedTx);
+                  if (added) {
+                    syncedCount++;
+                    console.log(`✅ Synced POS sale ${prismaTx.id} from Prisma`);
+                  }
+                } catch (error) {
+                  console.error(`⚠️ Failed to sync POS sale ${prismaTx.id}:`, error);
+                }
+              }
+              
+              if (syncedCount > 0) {
+                console.log(`✅ TRANSACTION PROVIDER: Synced ${syncedCount} POS sales from Prisma`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ TRANSACTION PROVIDER: Error during POS sales sync:', error);
+        }
+      }, 2000);
+    }
+  }, [isInitialized, transactions]);
 
   const value = {
     transactions,
