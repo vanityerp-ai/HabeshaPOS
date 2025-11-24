@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { ServiceStorage } from "@/lib/service-storage"
 import { parseISO, format } from "date-fns"
 import { AppointmentStatus } from "@/lib/types/appointment"
-import { getAllAppointments, addAppointmentWithValidation, updateAppointment, initializeAppointmentService, saveAppointments } from "@/lib/appointment-service"
+import { getAllAppointments, addAppointmentWithValidation, updateAppointment, initializeAppointmentService, saveAppointments, invalidateAppointmentsCache } from "@/lib/appointment-service"
 import { useTransactions } from "@/lib/transaction-provider"
 import { InventoryTransactionService } from "@/lib/inventory-transaction-service"
 import { Transaction, TransactionType, TransactionSource, TransactionStatus, PaymentMethod } from "@/lib/transaction-types"
@@ -16,6 +16,7 @@ import { ConsolidatedTransactionService } from "@/lib/consolidated-transaction-s
 import { transactionDeduplicationService } from "@/lib/transaction-deduplication-service"
 import { getCleanClientName } from "@/lib/utils/client-name-utils"
 import { AccessDenied } from "@/components/access-denied"
+import { useEntityChanges } from "@/hooks/use-real-time-sync"
 
 export default function AppointmentsPage() {
   const { toast } = useToast()
@@ -213,65 +214,40 @@ export default function AppointmentsPage() {
     });
   };
 
-  // Load appointments using the appointment service
-  useEffect(() => {
-    // Force a synchronization of all appointment data sources
-    const forceSyncAppointments = () => {
-      console.log("AppointmentsPage: Forcing synchronization of all appointment data sources");
-
-      // Initialize the appointment service to ensure all storage is in sync
-      initializeAppointmentService();
-
-      // Get all appointments from all sources (localStorage, mockAppointments, appointments array)
-      const allAppointments = getAllAppointments();
-      console.log("AppointmentsPage: Loaded appointments via service", allAppointments.length);
-
-      // Set the appointments state
+  // Load appointments from API (now uses database)
+  const loadAppointments = async () => {
+    try {
+      console.log("AppointmentsPage: Loading appointments from API");
+      const allAppointments = await getAllAppointments();
+      console.log("AppointmentsPage: Loaded appointments", allAppointments.length);
       setAppointments(allAppointments);
 
       // Check for missing transactions after appointments are loaded
       setTimeout(() => {
         checkAndCreateMissingTransactions(allAppointments);
       }, 2000);
+    } catch (error) {
+      console.error("AppointmentsPage: Error loading appointments", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load appointments"
+      });
+    }
+  };
 
-      // Also directly check localStorage to ensure we have the latest data
-      try {
-        const storedAppointments = localStorage.getItem("vanity_appointments");
-        if (storedAppointments) {
-          const parsedAppointments = JSON.parse(storedAppointments);
-          console.log("AppointmentsPage: Direct localStorage check found", parsedAppointments.length, "appointments");
-
-          // If localStorage has more appointments than our current state, use those instead
-          if (parsedAppointments.length > allAppointments.length) {
-            console.log("AppointmentsPage: Using localStorage appointments as they contain more data");
-            setAppointments(parsedAppointments);
-
-            // Also update the appointment service with this data
-            saveAppointments(parsedAppointments);
-
-            // Check for missing transactions for the localStorage appointments too
-            setTimeout(() => {
-              checkAndCreateMissingTransactions(parsedAppointments);
-            }, 2000);
-          }
-        }
-      } catch (error) {
-        console.error("AppointmentsPage: Error checking localStorage directly", error);
-      }
-    };
-
-    // Initial load
-    forceSyncAppointments();
-
-    // Set up an interval to refresh appointments every 5 seconds (more frequent than before)
-    const refreshInterval = setInterval(() => {
-      console.log("AppointmentsPage: Refreshing appointments...");
-      forceSyncAppointments();
-    }, 5000);
-
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(refreshInterval);
+  // Initial load
+  useEffect(() => {
+    loadAppointments();
   }, []);
+
+  // Set up real-time sync for appointments
+  useEntityChanges('Appointment', (change) => {
+    console.log("🔄 Appointment change detected:", change);
+    // Invalidate cache and reload appointments
+    invalidateAppointmentsCache();
+    loadAppointments();
+  });
 
   const handleAppointmentClick = (appointment: any) => {
     // If this is a reflected appointment, find and show the original appointment instead

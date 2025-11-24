@@ -55,67 +55,62 @@ const STORAGE_KEY = 'vanity_appointments';
 // Debug flag - set to true to enable console logging
 const DEBUG = true;
 
+// Cache for appointments (client-side only)
+let appointmentsCache: AppointmentData[] | null = null;
+let lastFetchTime: number = 0;
+const CACHE_DURATION = 5000; // 5 seconds
+
 /**
- * Get all appointments from localStorage
+ * Get all appointments from database via API
  * This is now the single source of truth for appointment data
  */
-export function getAllAppointments(): AppointmentData[] {
-  // Try to get appointments from localStorage
-  let appointments: AppointmentData[] = [];
+export async function getAllAppointments(): Promise<AppointmentData[]> {
+  // Server-side: return empty array
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  // Use cache if fresh
+  const now = Date.now();
+  if (appointmentsCache && (now - lastFetchTime) < CACHE_DURATION) {
+    if (DEBUG) console.log('AppointmentService: Using cached appointments', appointmentsCache.length);
+    return appointmentsCache;
+  }
+
   try {
-    const storedData = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (storedData) {
-      const parsed = JSON.parse(storedData);
-      // Ensure parsed data is an array
-      appointments = Array.isArray(parsed) ? parsed : [];
-      if (DEBUG) console.log('AppointmentService: Loaded from localStorage', appointments.length);
-    } else {
-      // Initialize with empty array if no data exists
-      if (DEBUG) console.log('AppointmentService: No appointments found, starting with empty array');
-      appointments = [];
+    const response = await fetch('/api/appointments');
+    if (!response.ok) {
+      throw new Error('Failed to fetch appointments');
     }
+    const data = await response.json();
+    appointmentsCache = data.appointments || [];
+    lastFetchTime = now;
+    
+    if (DEBUG) console.log('AppointmentService: Fetched from API', appointmentsCache.length);
+    return appointmentsCache;
   } catch (error) {
-    console.error('AppointmentService: Error loading from localStorage', error);
-    appointments = [];
+    console.error('AppointmentService: Error fetching appointments', error);
+    // Return cache if available, otherwise empty array
+    return appointmentsCache || [];
   }
-
-  // Ensure all appointments have booking references
-  let hasChanges = false;
-  appointments = appointments.map(appointment => {
-    if (!appointment.bookingReference) {
-      hasChanges = true;
-      return {
-        ...appointment,
-        bookingReference: `VH-${Date.now().toString().slice(-6)}`
-      };
-    }
-    return appointment;
-  });
-
-  // Save back if we added any booking references
-  if (hasChanges) {
-    saveAppointments(appointments);
-  }
-
-  if (DEBUG) console.log('AppointmentService: Retrieved appointments', appointments.length);
-  return appointments;
 }
 
 /**
- * Save appointments to localStorage
+ * Invalidate the appointments cache to force a refresh
+ */
+export function invalidateAppointmentsCache(): void {
+  appointmentsCache = null;
+  lastFetchTime = 0;
+  if (DEBUG) console.log('AppointmentService: Cache invalidated');
+}
+
+/**
+ * Deprecated: No longer saves to localStorage
+ * Appointments are now stored in database via API
  */
 export function saveAppointments(appointments: AppointmentData[]): void {
-  if (DEBUG) console.log('AppointmentService: Saving appointments', appointments.length);
-
-  // Save to localStorage
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(appointments));
-      if (DEBUG) console.log('AppointmentService: Saved to localStorage');
-    }
-  } catch (error) {
-    console.error('AppointmentService: Error saving to localStorage', error);
-  }
+  // No-op - kept for backward compatibility
+  if (DEBUG) console.log('AppointmentService: saveAppointments is deprecated');
 }
 
 /**
@@ -196,63 +191,58 @@ export async function addAppointmentWithValidation(appointment: AppointmentData)
 }
 
 /**
- * Add a new appointment (legacy function - consider using addAppointmentWithValidation)
+ * Add a new appointment via API
  */
-export function addAppointment(appointment: AppointmentData): AppointmentData {
+export async function addAppointment(appointment: AppointmentData): Promise<AppointmentData> {
   if (DEBUG) console.log('AppointmentService: Adding appointment', appointment);
 
-  // Generate booking reference if not provided
-  if (!appointment.bookingReference) {
-    appointment.bookingReference = `VH-${Date.now().toString().slice(-6)}`;
-  }
-
-  // Get all existing appointments
-  const allAppointments = getAllAppointments();
-
-  // Check if appointment with this ID already exists
-  const existingIndex = allAppointments.findIndex(a => a.id === appointment.id);
-
-  if (existingIndex >= 0) {
-    // Update existing appointment
-    allAppointments[existingIndex] = appointment;
-    if (DEBUG) console.log('AppointmentService: Updated existing appointment');
-  } else {
-    // Add new appointment
-    allAppointments.push(appointment);
-    if (DEBUG) console.log('AppointmentService: Added new appointment');
-  }
-
-  // Save appointments to all storage locations
-  saveAppointments(allAppointments);
-
-  // Emit real-time event for appointment creation
-  if (existingIndex < 0) {
-    realTimeService.emitEvent(RealTimeEventType.APPOINTMENT_CREATED, {
-      appointment,
-      clientName: appointment.clientName,
-      staffName: appointment.staffName,
-      service: appointment.service,
-      date: appointment.date
-    }, {
-      source: 'AppointmentService',
-      userId: appointment.staffId,
-      locationId: appointment.location
+  try {
+    const response = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(appointment)
     });
 
-    // Emit appointment sync event for cross-location availability updates
+    if (!response.ok) {
+      throw new Error('Failed to create appointment');
+    }
+
+    const data = await response.json();
+    
+    // Invalidate cache to force refresh
+    invalidateAppointmentsCache();
+    
+    // Emit real-time event for appointment creation
+    realTimeService.emitEvent(RealTimeEventType.APPOINTMENT_CREATED, {
+      appointment: data.appointment,
+      clientName: data.appointment.clientName,
+      staffName: data.appointment.staffName,
+      service: data.appointment.service,
+      date: data.appointment.date
+    }, {
+      source: 'AppointmentService',
+      userId: data.appointment.staffId,
+      locationId: data.appointment.location
+    });
+
+    // Emit appointment sync event
     appointmentSyncService.emitAppointmentCreated(
-      appointment.id,
-      appointment.staffId,
-      appointment.location,
+      data.appointment.id,
+      data.appointment.staffId,
+      data.appointment.location,
       {
-        appointment,
-        duration: appointment.duration,
-        date: appointment.date
+        appointment: data.appointment,
+        duration: data.appointment.duration,
+        date: data.appointment.date
       }
     );
-  }
 
-  return appointment;
+    if (DEBUG) console.log('AppointmentService: Created appointment via API');
+    return data.appointment;
+  } catch (error) {
+    console.error('AppointmentService: Error creating appointment', error);
+    throw error;
+  }
 }
 
 /**
@@ -264,7 +254,7 @@ export async function updateAppointmentWithValidation(
 ): Promise<{ success: boolean; appointment?: AppointmentData; error?: string }> {
   // If the update includes staff, date, or duration changes, validate availability
   if (updates.staffId || updates.date || updates.duration) {
-    const currentAppointment = getAppointmentById(appointmentId);
+    const currentAppointment = await getAppointmentById(appointmentId);
     if (!currentAppointment) {
       return {
         success: false,
@@ -306,36 +296,33 @@ export async function updateAppointmentWithValidation(
 }
 
 /**
- * Update an existing appointment (legacy function - consider using updateAppointmentWithValidation)
+ * Update an existing appointment via API
  */
 export async function updateAppointment(appointmentId: string, updates: Partial<AppointmentData>): Promise<AppointmentData | null> {
   if (DEBUG) console.log('AppointmentService: Updating appointment', appointmentId, updates);
 
-  // Get all existing appointments
-  const allAppointments = getAllAppointments();
+  try {
+    const response = await fetch(`/api/appointments/${appointmentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
 
-  // Find the appointment to update
-  const appointmentIndex = allAppointments.findIndex(a => a.id === appointmentId);
+    if (!response.ok) {
+      throw new Error('Failed to update appointment');
+    }
 
-  if (appointmentIndex >= 0) {
-    // Update the appointment
-    const updatedAppointment = {
-      ...allAppointments[appointmentIndex],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
+    const data = await response.json();
+    const updatedAppointment = data.appointment;
+    
+    // Invalidate cache
+    invalidateAppointmentsCache();
 
-    allAppointments[appointmentIndex] = updatedAppointment;
-
-    // Save appointments to all storage locations
-    saveAppointments(allAppointments);
-
-    // Emit real-time event for appointment update
+    // Emit real-time event
     const eventType = updates.status ? RealTimeEventType.APPOINTMENT_STATUS_CHANGED : RealTimeEventType.APPOINTMENT_UPDATED;
     realTimeService.emitEvent(eventType, {
       appointment: updatedAppointment,
       updates,
-      previousStatus: allAppointments[appointmentIndex].status,
       newStatus: updatedAppointment.status
     }, {
       source: 'AppointmentService',
@@ -343,7 +330,7 @@ export async function updateAppointment(appointmentId: string, updates: Partial<
       locationId: updatedAppointment.location
     });
 
-    // Emit appointment sync event for cross-location availability updates
+    // Emit appointment sync event
     appointmentSyncService.emitAppointmentUpdated(
       updatedAppointment.id,
       updatedAppointment.staffId,
@@ -356,44 +343,46 @@ export async function updateAppointment(appointmentId: string, updates: Partial<
       }
     );
 
-    // Update reflected appointments if this is not a reflected appointment
+    // Update reflected appointments
     if (!updatedAppointment.isReflected) {
       try {
         await appointmentReflectionService.updateReflectedAppointments(updatedAppointment);
       } catch (error) {
         console.error('Error updating reflected appointments:', error);
-        // Don't fail the main appointment update if reflection update fails
       }
     }
 
-    if (DEBUG) console.log('AppointmentService: Appointment updated successfully');
+    if (DEBUG) console.log('AppointmentService: Appointment updated via API');
     return updatedAppointment;
+  } catch (error) {
+    console.error('AppointmentService: Error updating appointment', error);
+    return null;
   }
-
-  if (DEBUG) console.log('AppointmentService: Appointment not found for update');
-  return null;
 }
 
 /**
- * Delete an appointment
+ * Delete an appointment via API
  */
 export async function deleteAppointment(appointmentId: string): Promise<boolean> {
   if (DEBUG) console.log('AppointmentService: Deleting appointment', appointmentId);
 
-  // Get all existing appointments
-  const allAppointments = getAllAppointments();
+  try {
+    // Get appointment details first for events
+    const allAppointments = await getAllAppointments();
+    const appointmentToDelete = allAppointments.find(a => a.id === appointmentId);
 
-  // Find the appointment to delete (for real-time event)
-  const appointmentToDelete = allAppointments.find(a => a.id === appointmentId);
+    const response = await fetch(`/api/appointments/${appointmentId}`, {
+      method: 'DELETE'
+    });
 
-  // Filter out the appointment to delete
-  const filteredAppointments = allAppointments.filter(a => a.id !== appointmentId);
+    if (!response.ok) {
+      throw new Error('Failed to delete appointment');
+    }
 
-  if (filteredAppointments.length < allAppointments.length) {
-    // Save appointments to all storage locations
-    saveAppointments(filteredAppointments);
+    // Invalidate cache
+    invalidateAppointmentsCache();
 
-    // Emit real-time event for appointment deletion
+    // Emit real-time event
     if (appointmentToDelete) {
       realTimeService.emitEvent(RealTimeEventType.APPOINTMENT_DELETED, {
         appointmentId,
@@ -406,31 +395,30 @@ export async function deleteAppointment(appointmentId: string): Promise<boolean>
         locationId: appointmentToDelete.location
       });
 
-      // Delete reflected appointments if this is not a reflected appointment
+      // Delete reflected appointments
       if (!appointmentToDelete.isReflected) {
         try {
           await appointmentReflectionService.deleteReflectedAppointments(appointmentId);
         } catch (error) {
           console.error('Error deleting reflected appointments:', error);
-          // Don't fail the main appointment deletion if reflection deletion fails
         }
       }
     }
 
-    if (DEBUG) console.log('AppointmentService: Appointment deleted successfully');
+    if (DEBUG) console.log('AppointmentService: Appointment deleted via API');
     return true;
+  } catch (error) {
+    console.error('AppointmentService: Error deleting appointment', error);
+    return false;
   }
-
-  if (DEBUG) console.log('AppointmentService: Appointment not found for deletion');
-  return false;
 }
 
 /**
  * Get appointment by ID
  */
-export function getAppointmentById(appointmentId: string): AppointmentData | null {
+export async function getAppointmentById(appointmentId: string): Promise<AppointmentData | null> {
   // Get all existing appointments
-  const allAppointments = getAllAppointments();
+  const allAppointments = await getAllAppointments();
 
   // Find the appointment
   const appointment = allAppointments.find(a => a.id === appointmentId);
@@ -440,28 +428,17 @@ export function getAppointmentById(appointmentId: string): AppointmentData | nul
 
 /**
  * Initialize the appointment service
- * This ensures that all storage locations are in sync
+ * No-op now that we use database storage
  */
 export function initializeAppointmentService(): void {
-  if (DEBUG) console.log('AppointmentService: Initializing');
-
-  // Get all appointments and save them back to ensure consistency
-  const allAppointments = getAllAppointments();
-  saveAppointments(allAppointments);
-
-  if (DEBUG) console.log('AppointmentService: Initialized with', allAppointments.length, 'appointments');
+  if (DEBUG) console.log('AppointmentService: Initialize called (no-op)');
 }
 
 /**
- * Clear all appointments (for testing purposes)
+ * Clear appointments cache (for testing purposes)
  */
 export function clearAllAppointments(): void {
-  if (DEBUG) console.log('AppointmentService: Clearing all appointments');
-
-  // Clear localStorage
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  if (DEBUG) console.log('AppointmentService: All appointments cleared');
+  if (DEBUG) console.log('AppointmentService: Clearing appointments cache');
+  invalidateAppointmentsCache();
+  if (DEBUG) console.log('AppointmentService: Cache cleared');
 }
