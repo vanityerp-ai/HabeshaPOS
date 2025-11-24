@@ -174,20 +174,28 @@ export async function addAppointmentWithValidation(appointment: AppointmentData)
   }
 
   // If validation passes, create the appointment
-  const createdAppointment = addAppointment(appointment);
-
-  // Create reflected appointments for staff with home service capability
   try {
-    await appointmentReflectionService.createReflectedAppointments(createdAppointment);
-  } catch (error) {
-    console.error('Error creating reflected appointments:', error);
-    // Don't fail the main appointment creation if reflection fails
-  }
+    const createdAppointment = await addAppointment(appointment);
 
-  return {
-    success: true,
-    appointment: createdAppointment
-  };
+    // Create reflected appointments for staff with home service capability
+    try {
+      await appointmentReflectionService.createReflectedAppointments(createdAppointment);
+    } catch (error) {
+      console.error('Error creating reflected appointments:', error);
+      // Don't fail the main appointment creation if reflection fails
+    }
+
+    return {
+      success: true,
+      appointment: createdAppointment
+    };
+  } catch (error) {
+    console.error('Error creating appointment:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create appointment'
+    };
+  }
 }
 
 /**
