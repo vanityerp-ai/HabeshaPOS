@@ -1,5 +1,5 @@
 // Enhanced Redis Caching Service for Vanity Hub
-import { Redis } from 'ioredis'
+// Note: Redis is optional - using memory cache fallback
 
 // Cache configuration interface
 interface CacheConfig {
@@ -30,7 +30,7 @@ interface CacheStats {
 }
 
 class RedisCacheService {
-  private redis: Redis | null = null
+  private redis: any = null
   private fallbackCache = new Map<string, CacheEntry>()
   private stats: CacheStats = {
     hits: 0,
@@ -48,29 +48,19 @@ class RedisCacheService {
   }
 
   private initializeRedis() {
+    // Redis is optional - using memory cache fallback for serverless deployment
     try {
       if (process.env.REDIS_URL) {
-        this.redis = new Redis(process.env.REDIS_URL, {
-          maxRetriesPerRequest: 3,
-          lazyConnect: true,
-          enableReadyCheck: true,
-          enableOfflineQueue: false,
-          connectTimeout: 10000,
-          commandTimeout: 5000,
-        })
-
-        this.redis.on('error', (error) => {
-          console.error('Redis connection error:', error)
-          this.stats.errors++
-        })
-
-        this.redis.on('connect', () => {
-          console.log('Redis connected successfully')
-        })
-
-        this.redis.on('ready', () => {
-          console.log('Redis ready for operations')
-        })
+        console.log('Redis URL configured, but using memory cache for serverless deployment')
+        // const { Redis } = require('ioredis')
+        // this.redis = new Redis(process.env.REDIS_URL, {
+        //   maxRetriesPerRequest: 3,
+        //   lazyConnect: true,
+        //   enableReadyCheck: true,
+        //   enableOfflineQueue: false,
+        //   connectTimeout: 10000,
+        //   commandTimeout: 5000,
+        // })
       }
     } catch (error) {
       console.warn('Failed to initialize Redis, using fallback cache:', error)

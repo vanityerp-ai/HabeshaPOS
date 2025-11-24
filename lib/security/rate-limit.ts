@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from 'ioredis'
 
 // In-memory store for development (when Redis is not available)
 const memoryStore = new Map<string, { count: number; resetTime: number }>()
 
-// Redis client (optional, falls back to memory store)
-let redis: Redis | null = null
+// Redis client type (optional, falls back to memory store)
+let redis: any = null
 
-try {
-  if (process.env.REDIS_URL) {
-    redis = new Redis(process.env.REDIS_URL)
-  }
-} catch (error) {
-  console.warn('Redis not available, using memory store for rate limiting')
-}
+// Redis is optional - we use memory store in production without Redis
+// try {
+//   if (process.env.REDIS_URL) {
+//     const { Redis } = require('ioredis')
+//     redis = new Redis(process.env.REDIS_URL)
+//   }
+// } catch (error) {
+//   console.warn('Redis not available, using memory store for rate limiting')
+// }
 
 export interface RateLimitOptions {
   windowMs: number // Time window in milliseconds
