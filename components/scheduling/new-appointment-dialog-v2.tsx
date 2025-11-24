@@ -617,7 +617,16 @@ export function NewAppointmentDialogV2({
   }, [open])
 
   const handleSubmit = async () => {
+    console.log("🔵 handleSubmit called", formData)
+    console.log("🔵 Validation check:", {
+      clientName: formData.clientName,
+      serviceId: formData.serviceId,
+      staffId: formData.staffId,
+      isSubmitting
+    })
+
     if (!formData.clientName || !formData.serviceId || !formData.staffId) {
+      console.log("❌ Validation failed - missing fields")
       toast({
         variant: "destructive",
         title: "Missing information",
