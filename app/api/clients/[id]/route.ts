@@ -12,10 +12,10 @@ function generateInitials(name: string): string {
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = params.id
+    const { id: clientId } = await params
 
     // Fetch client from Prisma (SINGLE SOURCE OF TRUTH)
     const client = await prisma.client.findUnique({
@@ -82,10 +82,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = params.id
+    const { id: clientId } = await params
     const data = await request.json()
 
     console.log(`🔄 Updating client ${clientId} with data:`, data)
@@ -206,10 +206,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = params.id
+    const { id: clientId } = await params
 
     // Check if client exists
     const existingClient = await prisma.client.findUnique({

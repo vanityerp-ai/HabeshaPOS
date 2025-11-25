@@ -14,18 +14,18 @@ export class ClientPortalTransactionSync {
    * Convert completed client portal appointments to transactions
    * This should be called periodically or when appointments are marked as completed
    */
-  static syncClientPortalAppointments(addTransaction: (transaction: any) => any) {
+  static async syncClientPortalAppointments(addTransaction: (transaction: any) => any) {
     console.log('🔄 CLIENT PORTAL SYNC: Starting appointment to transaction sync');
-    
+
     try {
       // Safety check: ensure addTransaction function is provided
       if (!addTransaction || typeof addTransaction !== 'function') {
         console.error('❌ CLIENT PORTAL SYNC: addTransaction function is not provided or invalid');
         return 0;
       }
-      
+
       // Get all appointments
-      const appointments = getAllAppointments();
+      const appointments = await getAllAppointments();
       console.log(`📋 Found ${appointments.length} total appointments`);
       
       // Filter for client portal appointments that are completed but not yet synced

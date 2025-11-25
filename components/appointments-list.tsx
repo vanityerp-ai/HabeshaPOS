@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-provider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -15,9 +16,12 @@ interface AppointmentsListProps {
 
 export function AppointmentsList({ date, onlyMine = false }: AppointmentsListProps) {
   const { user, currentLocation } = useAuth()
+  const [allAppointments, setAllAppointments] = useState<any[]>([])
 
-  // Get all REAL appointments from appointment service - NO mock data
-  const allAppointments = getAllAppointments();
+  // Load appointments asynchronously
+  useEffect(() => {
+    getAllAppointments().then(setAllAppointments)
+  }, [])
 
   // Filter REAL appointments based on location, date, and staff
   const filteredAppointments = allAppointments.filter((appointment) => {

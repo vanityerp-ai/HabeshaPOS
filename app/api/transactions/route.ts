@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getServerSession } from "next-auth"
 
 /**
  * GET /api/transactions
@@ -30,7 +29,6 @@ export async function GET(request: Request) {
         user: {
           select: {
             id: true,
-            name: true,
             email: true
           }
         },
@@ -61,11 +59,6 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession()
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const data = await request.json()
 
     console.log("💾 Creating transaction in database:", {
@@ -105,7 +98,6 @@ export async function POST(request: Request) {
         user: {
           select: {
             id: true,
-            name: true,
             email: true
           }
         },

@@ -85,8 +85,8 @@ export class StaffAvailabilityService {
   async checkStaffAvailability(check: StaffAvailabilityCheck): Promise<AvailabilityResult> {
     try {
       // Get all appointments across all locations for this staff member
-      const allAppointments = getAllAppointments()
-      
+      const allAppointments = await getAllAppointments()
+
       // Filter appointments for this staff member (excluding cancelled/completed/no-show)
       const staffAppointments = allAppointments.filter(appointment => {
         // Skip if different staff member
@@ -280,8 +280,8 @@ export class StaffAvailabilityService {
    * Get all conflicting appointments for a staff member on a specific date
    */
   async getStaffConflictsForDate(staffId: string, date: Date): Promise<any[]> {
-    const allAppointments = getAllAppointments()
-    
+    const allAppointments = await getAllAppointments()
+
     return allAppointments.filter(appointment => {
       if (appointment.staffId !== staffId) return false
       if (['cancelled', 'completed', 'no-show'].includes(appointment.status?.toLowerCase())) return false
@@ -312,7 +312,7 @@ export class StaffAvailabilityService {
       endTime: Date
     }>
   }> {
-    const allAppointments = getAllAppointments()
+    const allAppointments = await getAllAppointments()
 
     // Filter appointments for this staff member
     const staffAppointments = allAppointments.filter(appointment => {

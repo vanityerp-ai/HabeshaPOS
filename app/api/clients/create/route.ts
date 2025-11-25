@@ -40,17 +40,18 @@ export async function POST(request: Request) {
     if (phoneExists || nameExists) {
       const duplicateType = phoneExists ? 'phone' : 'name'
       const existingClient = phoneExists || nameExists
-      
+
       return NextResponse.json({
         error: "Duplicate client found",
         duplicateType,
         existingClient: {
           id: existingClient?.id,
+          userId: existingClient?.userId, // Add userId for appointment creation
           name: existingClient?.name,
           phone: existingClient?.phone,
           email: existingClient?.user?.email
         },
-        message: duplicateType === 'phone' 
+        message: duplicateType === 'phone'
           ? `A client with phone number ${data.phone} already exists.`
           : `A client with the name "${data.name}" already exists.`
       }, { status: 409 })
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
     // Transform the response to match the expected client format
     const responseClient = {
       id: client.id,
+      userId: user.id, // Add userId for appointment creation
       name: client.name,
       email: user.email,
       phone: client.phone,

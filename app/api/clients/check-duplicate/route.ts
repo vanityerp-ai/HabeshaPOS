@@ -36,6 +36,7 @@ export async function POST(request: Request) {
           type: 'phone',
           client: {
             id: phoneMatch.id,
+            userId: phoneMatch.userId, // Add userId for appointment creation
             name: phoneMatch.name,
             phone: phoneMatch.phone,
             email: phoneMatch.user?.email
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
           type: 'name',
           client: {
             id: nameMatch.id,
+            userId: nameMatch.userId, // Add userId for appointment creation
             name: nameMatch.name,
             phone: nameMatch.phone,
             email: nameMatch.user?.email

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     // Get all appointments from the appointment service
     // This combines localStorage, mockAppointments, and appointments arrays
-    let filteredAppointments = getAllAppointments();
+    let filteredAppointments = await getAllAppointments();
     console.log("API: Retrieved all appointments", filteredAppointments.length);
 
     // Apply location-based access control

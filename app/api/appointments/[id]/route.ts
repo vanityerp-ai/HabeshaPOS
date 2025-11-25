@@ -9,11 +9,12 @@ import { getUserFromHeaders } from "@/lib/auth-server";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const appointment = await prisma.appointment.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         client: {
           select: {
@@ -102,15 +103,16 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const currentUser = getUserFromHeaders(request);
     const data = await request.json();
 
     // Update appointment in database
     const updatedAppointment = await prisma.appointment.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         clientId: data.clientId,
         staffId: data.staffId,
@@ -183,14 +185,15 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const currentUser = getUserFromHeaders(request);
 
     // Get appointment details before deletion for tracking
     const appointment = await prisma.appointment.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { locationId: true }
     });
 
@@ -203,13 +206,13 @@ export async function DELETE(
 
     // Delete appointment (cascade will handle related records)
     await prisma.appointment.delete({
-      where: { id: params.id }
+      where: { id }
     });
 
     // Track change for real-time sync
     await trackChange({
       entityType: "Appointment",
-      entityId: params.id,
+      entityId: id,
       changeType: "DELETE",
       locationId: appointment.locationId,
       userId: currentUser?.id

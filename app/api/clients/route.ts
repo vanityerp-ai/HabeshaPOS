@@ -125,6 +125,7 @@ export async function GET(request: Request) {
 
       return {
         id: client.id,
+        userId: client.userId, // Add userId for appointment creation
         name: client.name,
         email: client.email || client.user?.email || '',
         phone: client.phone || '',

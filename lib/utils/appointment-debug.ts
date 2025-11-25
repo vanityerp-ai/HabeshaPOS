@@ -18,24 +18,24 @@ export interface AppointmentDebugInfo {
 /**
  * Get debug information about all appointments
  */
-export function getAppointmentDebugInfo(): {
+export async function getAppointmentDebugInfo(): Promise<{
   original: AppointmentDebugInfo[];
   reflected: AppointmentDebugInfo[];
   orphaned: AppointmentDebugInfo[];
-} {
-  const allAppointments = getAllAppointments();
-  
+}> {
+  const allAppointments = await getAllAppointments();
+
   const original: AppointmentDebugInfo[] = [];
   const reflected: AppointmentDebugInfo[] = [];
   const orphaned: AppointmentDebugInfo[] = [];
-  
+
   // Get all original appointment IDs
   const originalIds = new Set(
     allAppointments
       .filter(apt => !apt.isReflected)
       .map(apt => apt.id)
   );
-  
+
   allAppointments.forEach(apt => {
     const debugInfo: AppointmentDebugInfo = {
       id: apt.id,
@@ -47,7 +47,7 @@ export function getAppointmentDebugInfo(): {
       originalAppointmentId: apt.originalAppointmentId,
       reflectionType: apt.reflectionType
     };
-    
+
     if (apt.isReflected) {
       if (apt.originalAppointmentId && originalIds.has(apt.originalAppointmentId)) {
         reflected.push(debugInfo);
@@ -58,15 +58,15 @@ export function getAppointmentDebugInfo(): {
       original.push(debugInfo);
     }
   });
-  
+
   return { original, reflected, orphaned };
 }
 
 /**
  * Log appointment debug information to console
  */
-export function logAppointmentDebugInfo(): void {
-  const { original, reflected, orphaned } = getAppointmentDebugInfo();
+export async function logAppointmentDebugInfo(): Promise<void> {
+  const { original, reflected, orphaned } = await getAppointmentDebugInfo();
   
   console.group('🔍 Appointment Debug Information');
   
@@ -145,13 +145,13 @@ export function shouldDisplayAsPrimary(appointment: any): boolean {
 /**
  * Get the display appointment (original if reflected, or the appointment itself)
  */
-export function getDisplayAppointment(appointment: any): any {
+export async function getDisplayAppointment(appointment: any): Promise<any> {
   if (appointment.isReflected && appointment.originalAppointmentId) {
-    const allAppointments = getAllAppointments();
+    const allAppointments = await getAllAppointments();
     const original = allAppointments.find(apt => apt.id === appointment.originalAppointmentId);
     return original || appointment;
   }
-  
+
   return appointment;
 }
 

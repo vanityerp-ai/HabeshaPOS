@@ -667,7 +667,7 @@ export function EnhancedAppointmentDetailsDialog({
                               </TooltipProvider>
                             ) : (
                               <span className="text-xs text-muted-foreground mt-1">
-                                {format(parseISO(showTimestamp), "HH:mm")}
+                                {format(parseISO(showTimestamp), "dd-MM-yyyy HH:mm")}
                               </span>
                             )
                           )}

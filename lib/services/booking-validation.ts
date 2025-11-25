@@ -204,8 +204,8 @@ export class BookingValidationService {
       }
 
       // Check for back-to-back appointments across different locations
-      const allAppointments = getAllAppointments()
-      const staffAppointments = allAppointments.filter(apt => 
+      const allAppointments = await getAllAppointments()
+      const staffAppointments = allAppointments.filter(apt =>
         apt.staffId === request.staffId && 
         !['cancelled', 'completed', 'no-show'].includes(apt.status?.toLowerCase()) &&
         apt.id !== request.excludeAppointmentId

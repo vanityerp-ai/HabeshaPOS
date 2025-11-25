@@ -304,8 +304,8 @@ describe('AppointmentReflectionService', () => {
   });
 
   describe('utility methods', () => {
-    it('should correctly identify reflected appointments', () => {
-      mockGetAllAppointments.mockReturnValue([
+    it('should correctly identify reflected appointments', async () => {
+      mockGetAllAppointments.mockResolvedValue([
         {
           id: 'apt-1',
    clientId: 'client-staff-1-z43q',
@@ -336,11 +336,11 @@ describe('AppointmentReflectionService', () => {
         }
       ]);
 
-      expect(appointmentReflectionService.isReflectedAppointment('apt-1')).toBe(false);
-      expect(appointmentReflectionService.isReflectedAppointment('reflected-apt-1-home')).toBe(true);
+      expect(await appointmentReflectionService.isReflectedAppointment('apt-1')).toBe(false);
+      expect(await appointmentReflectionService.isReflectedAppointment('reflected-apt-1-home')).toBe(true);
     });
 
-    it('should get original appointment for reflected appointment', () => {
+    it('should get original appointment for reflected appointment', async () => {
       const appointments = [
         {
           id: 'apt-1',
@@ -372,9 +372,9 @@ describe('AppointmentReflectionService', () => {
         }
       ];
 
-      mockGetAllAppointments.mockReturnValue(appointments);
+      mockGetAllAppointments.mockResolvedValue(appointments);
 
-      const originalAppointment = appointmentReflectionService.getOriginalAppointment('reflected-apt-1-home');
+      const originalAppointment = await appointmentReflectionService.getOriginalAppointment('reflected-apt-1-home');
       expect(originalAppointment).toMatchObject({
         id: 'apt-1',
         clientName: 'John Doe'

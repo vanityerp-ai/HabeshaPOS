@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useAuth } from "@/lib/auth-provider"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,11 +32,15 @@ export function AppointmentCalendar({
   const [date, setDate] = useState<Date>(selectedDate)
   const [viewMode, setViewMode] = useState<"day" | "week" | "month">(initialViewMode)
   const [staffFilter, setStaffFilter] = useState<string>("all")
+  const [allAppointments, setAllAppointments] = useState<any[]>([])
+
+  // Load appointments asynchronously
+  useEffect(() => {
+    getAllAppointments().then(setAllAppointments)
+  }, [])
 
   // Filter REAL appointments based on location, date, and staff - NO mock data
   const filteredAppointments = useMemo(() => {
-    // Get all real appointments from the appointment service
-    const allAppointments = getAllAppointments();
 
     return allAppointments.filter((appointment) => {
       // Filter by location with cross-location blocking support
@@ -101,7 +105,7 @@ export function AppointmentCalendar({
 
       return true
     })
-  }, [currentLocation, date, viewMode, staffFilter])
+  }, [allAppointments, currentLocation, date, viewMode, staffFilter])
 
   // Use the REAL staff data from HR management system - NO mock data
   const { activeStaff: realStaff, getActiveStaffByLocation, getActiveStaffWithHomeService } = useStaff();

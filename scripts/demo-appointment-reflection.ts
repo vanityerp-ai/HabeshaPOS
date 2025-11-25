@@ -45,7 +45,7 @@ export async function demonstrateAppointmentReflection() {
 
       // Check for reflected appointments
       console.log('🔍 Checking for reflected appointments...');
-      const reflectedAppointments = appointmentReflectionService.getReflectedAppointments(result.appointment!.id);
+      const reflectedAppointments = await appointmentReflectionService.getReflectedAppointments(result.appointment!.id);
 
       if (reflectedAppointments.length > 0) {
         console.log(`✅ Found ${reflectedAppointments.length} reflected appointment(s):`);

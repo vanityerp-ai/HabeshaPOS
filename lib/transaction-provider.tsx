@@ -101,11 +101,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (isInitialized) {
       console.log('🔄 TRANSACTION PROVIDER: Running client portal appointment sync');
-      
+
       // Run the sync with a small delay to ensure everything is loaded
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const syncedCount = ClientPortalTransactionSync.syncClientPortalAppointments(addTransaction);
+          const syncedCount = await ClientPortalTransactionSync.syncClientPortalAppointments(addTransaction);
           if (syncedCount > 0) {
             console.log(`✅ TRANSACTION PROVIDER: Synced ${syncedCount} client portal appointments to transactions`);
           }
@@ -432,14 +432,24 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('❌ Failed to save transaction to database:', error);
+        let errorDetails;
+        try {
+          errorDetails = await response.json();
+        } catch (e) {
+          errorDetails = await response.text();
+        }
+        console.error('❌ Failed to save transaction to database:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorDetails
+        });
       } else {
         const result = await response.json();
         console.log('✅ Transaction saved to database:', result.transaction?.id);
       }
     } catch (error) {
       console.error('❌ Error saving transaction to database:', error);
+      throw error; // Re-throw to be caught by the outer catch
     }
   };
 

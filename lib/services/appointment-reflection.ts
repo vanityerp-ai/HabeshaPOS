@@ -91,7 +91,7 @@ class AppointmentReflectionService {
     }
 
     const reflectedAppointments: ReflectedAppointment[] = [];
-    const allAppointments = getAllAppointments();
+    const allAppointments = await getAllAppointments();
 
     if (originalAppointment.location === 'home') {
       // Original is home service - create reflections in physical locations
@@ -171,10 +171,10 @@ class AppointmentReflectionService {
    * Update reflected appointments when original appointment changes
    */
   async updateReflectedAppointments(originalAppointment: AppointmentData): Promise<void> {
-    const allAppointments = getAllAppointments();
-    
+    const allAppointments = await getAllAppointments();
+
     // Find all reflected appointments for this original appointment
-    const reflectedAppointments = allAppointments.filter(apt => 
+    const reflectedAppointments = allAppointments.filter(apt =>
       apt.originalAppointmentId === originalAppointment.id && apt.isReflected
     );
 
@@ -210,10 +210,10 @@ class AppointmentReflectionService {
    * Delete reflected appointments when original appointment is deleted
    */
   async deleteReflectedAppointments(originalAppointmentId: string): Promise<void> {
-    const allAppointments = getAllAppointments();
-    
+    const allAppointments = await getAllAppointments();
+
     // Filter out reflected appointments for this original appointment
-    const filteredAppointments = allAppointments.filter(apt => 
+    const filteredAppointments = allAppointments.filter(apt =>
       !(apt.originalAppointmentId === originalAppointmentId && apt.isReflected)
     );
 
@@ -228,9 +228,9 @@ class AppointmentReflectionService {
   /**
    * Get all reflected appointments for a specific original appointment
    */
-  getReflectedAppointments(originalAppointmentId: string): AppointmentData[] {
-    const allAppointments = getAllAppointments();
-    return allAppointments.filter(apt => 
+  async getReflectedAppointments(originalAppointmentId: string): Promise<AppointmentData[]> {
+    const allAppointments = await getAllAppointments();
+    return allAppointments.filter(apt =>
       apt.originalAppointmentId === originalAppointmentId && apt.isReflected
     );
   }
@@ -238,8 +238,8 @@ class AppointmentReflectionService {
   /**
    * Check if an appointment is a reflected appointment
    */
-  isReflectedAppointment(appointmentId: string): boolean {
-    const allAppointments = getAllAppointments();
+  async isReflectedAppointment(appointmentId: string): Promise<boolean> {
+    const allAppointments = await getAllAppointments();
     const appointment = allAppointments.find(apt => apt.id === appointmentId);
     return appointment?.isReflected === true;
   }
@@ -247,10 +247,10 @@ class AppointmentReflectionService {
   /**
    * Get the original appointment for a reflected appointment
    */
-  getOriginalAppointment(reflectedAppointmentId: string): AppointmentData | null {
-    const allAppointments = getAllAppointments();
+  async getOriginalAppointment(reflectedAppointmentId: string): Promise<AppointmentData | null> {
+    const allAppointments = await getAllAppointments();
     const reflectedAppointment = allAppointments.find(apt => apt.id === reflectedAppointmentId);
-    
+
     if (!reflectedAppointment?.originalAppointmentId) {
       return null;
     }
@@ -262,7 +262,7 @@ class AppointmentReflectionService {
    * Cleanup orphaned reflected appointments (where original no longer exists)
    */
   async cleanupOrphanedReflections(): Promise<number> {
-    const allAppointments = getAllAppointments();
+    const allAppointments = await getAllAppointments();
     const originalAppointmentIds = new Set(
       allAppointments
         .filter(apt => !apt.isReflected)

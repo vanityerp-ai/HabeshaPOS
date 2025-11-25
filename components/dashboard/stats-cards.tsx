@@ -203,7 +203,7 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     // The useEffect above will automatically recalculate when transactions change
   }, [transactions, filterTransactions, currentLocation, dateRange])
 
-  useRealTimeEvent(RealTimeEventType.APPOINTMENT_CREATED, () => {
+  useRealTimeEvent(RealTimeEventType.APPOINTMENT_CREATED, async () => {
     console.log('📊 STATS CARDS: Appointment created, refreshing counts...')
     // Force recalculation of dynamic counts
     const filters: any = {}
@@ -220,7 +220,7 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
       t.source === TransactionSource.POS || t.source === TransactionSource.CALENDAR
     )
 
-    const allAppointments = getAllAppointments()
+    const allAppointments = await getAllAppointments()
     // Filter out reflected appointments from statistics
     let filteredAppointments = allAppointments.filter(apt => !apt.isReflected)
 
@@ -375,8 +375,9 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
       })))
 
       // Check for completed appointments and their corresponding transactions
-      const allAppointments = getAllAppointments()
-      const completedAppointments = allAppointments.filter(apt => apt.status === 'completed')
+      // Note: getAllAppointments is async, so we need to handle it properly
+      getAllAppointments().then(allAppointments => {
+        const completedAppointments = allAppointments.filter(apt => apt.status === 'completed')
       console.log('📊 COMPLETED APPOINTMENTS ANALYSIS:')
       console.log('🔍 Total completed appointments:', completedAppointments.length)
 
@@ -444,6 +445,9 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
 
         console.log('🔧 RECOMMENDATION: Use the appointments page to complete these appointments properly, or use the debug transactions page to create missing transactions.')
       }
+      }).catch(error => {
+        console.error('📊 STATS CARDS: Error fetching appointments:', error)
+      })
 
       console.log('📊 STATS CARDS: Updated revenue data:', {
         total: analytics.totalRevenue,
@@ -618,289 +622,293 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
   useEffect(() => {
     console.log('📊 STATS CARDS: Calculating pending revenue from appointments')
 
-    try {
-      // Get all appointments
-      const allAppointments = getAllAppointments()
-      console.log('📊 ALL APPOINTMENTS:', allAppointments.map(apt => ({
-        id: apt.id,
-        clientName: apt.clientName,
-        service: apt.service,
-        status: apt.status,
-        price: apt.price,
-        priceType: typeof apt.price,
-        location: apt.location,
-        date: apt.date
-      })))
-
-      // If no appointments exist, create some test appointments for pending revenue
-      if (allAppointments.length === 0) {
-        console.log('📊 NO APPOINTMENTS: Creating test appointments for pending revenue')
-        const testAppointments = [
-          {
-            id: "pending-test-1",
-            clientId: "test-client-1",
-            clientName: "Test Client 1",
-            staffId: "1",
-            staffName: "Emma Johnson",
-            service: "Haircut & Style",
-            serviceId: "1",
-            date: new Date().toISOString(),
-            duration: 60,
-            status: "confirmed",
-            location: "loc1",
-            price: 75,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: "pending-test-2",
-            clientId: "test-client-2",
-            clientName: "Test Client 2",
-            staffId: "2",
-            staffName: "Michael Chen",
-            service: "Color & Highlights",
-            serviceId: "2",
-            date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-            duration: 120,
-            status: "arrived",
-            location: "loc1",
-            price: 150,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            id: "pending-test-3",
-            clientId: "lula-client",
-            clientName: "Lula",
-            staffId: "3",
-            staffName: "Robert Taylor",
-            service: "Color & Highlights",
-            serviceId: "2",
-            date: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-            duration: 120,
-            status: "confirmed",
-            location: "loc1",
-            price: 150,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        ]
-
-        // Save directly to localStorage and refresh the appointments list
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('vanity_appointments', JSON.stringify(testAppointments))
-          console.log('📊 CREATED TEST APPOINTMENTS:', testAppointments.length)
-          // Force a re-render by updating the component
-          setTimeout(() => {
-            window.location.reload()
-          }, 100)
-          return
-        }
-      }
-
-
-
-
-
-      // Get the current appointments list (might have been updated with test data)
-      const currentAppointments = getAllAppointments()
-
-      // Ensure appointments have proper price data
-      const appointmentsWithPrices = currentAppointments.map(appointment => {
-        if (appointment.price && typeof appointment.price === 'number' && appointment.price > 0) {
-          return appointment // Already has valid price
-        }
-
-        // Try to set price from service lookup or fallback
-        let price = 0
-
-        // Try service lookup first
-        try {
-          const services = ServiceStorage.getServices()
-          const service = services.find(s =>
-            s.id === appointment.serviceId ||
-            s.name === appointment.service ||
-            s.name.toLowerCase() === appointment.service?.toLowerCase()
-          )
-          if (service && typeof service.price === 'number' && service.price > 0) {
-            price = service.price
-            console.log(`📊 SET PRICE FROM SERVICE LOOKUP: ${appointment.service} = ${price}`)
-          }
-        } catch (error) {
-          console.log(`📊 SERVICE LOOKUP ERROR:`, error)
-        }
-
-        // Fallback pricing if service lookup failed
-        if (price === 0) {
-          const serviceName = appointment.service?.toLowerCase() || ''
-          if (serviceName.includes('color') || serviceName.includes('highlight')) {
-            price = 150
-            console.log(`📊 SET FALLBACK COLOR PRICE: ${appointment.service} = ${price}`)
-          } else if (serviceName.includes('haircut') || serviceName.includes('cut')) {
-            price = 75
-            console.log(`📊 SET FALLBACK HAIRCUT PRICE: ${appointment.service} = ${price}`)
-          } else if (serviceName.includes('blowout') || serviceName.includes('style')) {
-            price = 65
-            console.log(`📊 SET FALLBACK STYLING PRICE: ${appointment.service} = ${price}`)
-          } else {
-            price = 50
-            console.log(`📊 SET GENERIC FALLBACK PRICE: ${appointment.service} = ${price}`)
-          }
-        }
-
-        return {
-          ...appointment,
-          price: price
-        }
-      })
-
-      // Filter appointments that contribute to pending revenue
-      const pendingAppointments = appointmentsWithPrices.filter(appointment => {
-        // Exclude reflected appointments from revenue calculations
-        if (appointment.isReflected) {
-          return false
-        }
-
-        // Only include appointments with pending statuses
-        const pendingStatuses = ['confirmed', 'arrived', 'service-started']
-        if (!pendingStatuses.includes(appointment.status)) {
-          return false
-        }
-
-        // Filter by location if not "all"
-        if (currentLocation !== 'all' && appointment.location !== currentLocation) {
-          return false
-        }
-
-        // Filter by date range if provided
-        if (dateRange?.from && dateRange?.to) {
-          const appointmentDate = new Date(appointment.date)
-          if (appointmentDate < dateRange.from || appointmentDate > dateRange.to) {
-            return false
-          }
-        }
-
-        return true
-      })
-
-      console.log('📊 PENDING REVENUE: Found pending appointments:', {
-        total: appointmentsWithPrices.length,
-        pending: pendingAppointments.length,
-        currentLocation,
-        dateRange
-      })
-
-      // Debug: Log each pending appointment details
-      console.log(`📊 PENDING APPOINTMENTS DETAILED BREAKDOWN:`)
-      pendingAppointments.forEach((apt, index) => {
-        console.log(`📊 PENDING APPOINTMENT ${index + 1}:`, {
+    const calculatePendingRevenue = async () => {
+      try {
+        // Get all appointments
+        const allAppointments = await getAllAppointments()
+        console.log('📊 ALL APPOINTMENTS:', allAppointments.map(apt => ({
           id: apt.id,
           clientName: apt.clientName,
           service: apt.service,
-          serviceId: apt.serviceId,
           status: apt.status,
-          location: apt.location,
           price: apt.price,
           priceType: typeof apt.price,
-          date: apt.date,
-          additionalServices: apt.additionalServices,
-          products: apt.products,
-          fullAppointmentObject: apt
+          location: apt.location,
+          date: apt.date
+        })))
+
+        // If no appointments exist, create some test appointments for pending revenue
+        if (allAppointments.length === 0) {
+          console.log('📊 NO APPOINTMENTS: Creating test appointments for pending revenue')
+          const testAppointments = [
+            {
+              id: "pending-test-1",
+              clientId: "test-client-1",
+              clientName: "Test Client 1",
+              staffId: "1",
+              staffName: "Emma Johnson",
+              service: "Haircut & Style",
+              serviceId: "1",
+              date: new Date().toISOString(),
+              duration: 60,
+              status: "confirmed",
+              location: "loc1",
+              price: 75,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: "pending-test-2",
+              clientId: "test-client-2",
+              clientName: "Test Client 2",
+              staffId: "2",
+              staffName: "Michael Chen",
+              service: "Color & Highlights",
+              serviceId: "2",
+              date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+              duration: 120,
+              status: "arrived",
+              location: "loc1",
+              price: 150,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: "pending-test-3",
+              clientId: "lula-client",
+              clientName: "Lula",
+              staffId: "3",
+              staffName: "Robert Taylor",
+              service: "Color & Highlights",
+              serviceId: "2",
+              date: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+              duration: 120,
+              status: "confirmed",
+              location: "loc1",
+              price: 150,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ]
+
+          // Save directly to localStorage and refresh the appointments list
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('vanity_appointments', JSON.stringify(testAppointments))
+            console.log('📊 CREATED TEST APPOINTMENTS:', testAppointments.length)
+            // Force a re-render by updating the component
+            setTimeout(() => {
+              window.location.reload()
+            }, 100)
+            return
+          }
+        }
+
+
+
+
+
+        // Get the current appointments list (might have been updated with test data)
+        const currentAppointments = await getAllAppointments()
+
+        // Ensure appointments have proper price data
+        const appointmentsWithPrices = currentAppointments.map(appointment => {
+          if (appointment.price && typeof appointment.price === 'number' && appointment.price > 0) {
+            return appointment // Already has valid price
+          }
+
+          // Try to set price from service lookup or fallback
+          let price = 0
+
+          // Try service lookup first
+          try {
+            const services = ServiceStorage.getServices()
+            const service = services.find(s =>
+              s.id === appointment.serviceId ||
+              s.name === appointment.service ||
+              s.name.toLowerCase() === appointment.service?.toLowerCase()
+            )
+            if (service && typeof service.price === 'number' && service.price > 0) {
+              price = service.price
+              console.log(`📊 SET PRICE FROM SERVICE LOOKUP: ${appointment.service} = ${price}`)
+            }
+          } catch (error) {
+            console.log(`📊 SERVICE LOOKUP ERROR:`, error)
+          }
+
+          // Fallback pricing if service lookup failed
+          if (price === 0) {
+            const serviceName = appointment.service?.toLowerCase() || ''
+            if (serviceName.includes('color') || serviceName.includes('highlight')) {
+              price = 150
+              console.log(`📊 SET FALLBACK COLOR PRICE: ${appointment.service} = ${price}`)
+            } else if (serviceName.includes('haircut') || serviceName.includes('cut')) {
+              price = 75
+              console.log(`📊 SET FALLBACK HAIRCUT PRICE: ${appointment.service} = ${price}`)
+            } else if (serviceName.includes('blowout') || serviceName.includes('style')) {
+              price = 65
+              console.log(`📊 SET FALLBACK STYLING PRICE: ${appointment.service} = ${price}`)
+            } else {
+              price = 50
+              console.log(`📊 SET GENERIC FALLBACK PRICE: ${appointment.service} = ${price}`)
+            }
+          }
+
+          return {
+            ...appointment,
+            price: price
+          }
         })
 
-        // Test revenue calculation for this appointment
-        const testRevenue = calculateAppointmentRevenue(apt)
-        console.log(`📊 TEST REVENUE FOR ${apt.clientName}:`, testRevenue)
-      })
+        // Filter appointments that contribute to pending revenue
+        const pendingAppointments = appointmentsWithPrices.filter(appointment => {
+          // Exclude reflected appointments from revenue calculations
+          if (appointment.isReflected) {
+            return false
+          }
 
-      let totalPendingRevenue = 0
-      let serviceRevenue = 0
-      let productRevenue = 0
+          // Only include appointments with pending statuses
+          const pendingStatuses = ['confirmed', 'arrived', 'service-started']
+          if (!pendingStatuses.includes(appointment.status)) {
+            return false
+          }
 
-      pendingAppointments.forEach(appointment => {
-        // Check if this appointment already has a completed transaction
-        const existingTransaction = transactions.find(tx =>
-          tx.reference?.type === 'appointment' &&
-          tx.reference?.id === appointment.id &&
-          tx.status === TransactionStatus.COMPLETED
-        )
+          // Filter by location if not "all"
+          if (currentLocation !== 'all' && appointment.location !== currentLocation) {
+            return false
+          }
 
-        // Only count revenue if no completed transaction exists
-        if (!existingTransaction) {
-          console.log(`📊 CALCULATING REVENUE FOR: ${appointment.clientName} - ${appointment.service}`)
-          console.log(`📊 APPOINTMENT DATA:`, {
-            id: appointment.id,
-            price: appointment.price,
-            priceType: typeof appointment.price,
-            service: appointment.service,
-            serviceId: appointment.serviceId,
-            status: appointment.status
+          // Filter by date range if provided
+          if (dateRange?.from && dateRange?.to) {
+            const appointmentDate = new Date(appointment.date)
+            if (appointmentDate < dateRange.from || appointmentDate > dateRange.to) {
+              return false
+            }
+          }
+
+          return true
+        })
+
+        console.log('📊 PENDING REVENUE: Found pending appointments:', {
+          total: appointmentsWithPrices.length,
+          pending: pendingAppointments.length,
+          currentLocation,
+          dateRange
+        })
+
+        // Debug: Log each pending appointment details
+        console.log(`📊 PENDING APPOINTMENTS DETAILED BREAKDOWN:`)
+        pendingAppointments.forEach((apt, index) => {
+          console.log(`📊 PENDING APPOINTMENT ${index + 1}:`, {
+            id: apt.id,
+            clientName: apt.clientName,
+            service: apt.service,
+            serviceId: apt.serviceId,
+            status: apt.status,
+            location: apt.location,
+            price: apt.price,
+            priceType: typeof apt.price,
+            date: apt.date,
+            additionalServices: apt.additionalServices,
+            products: apt.products,
+            fullAppointmentObject: apt
           })
 
-          // Use the helper function to calculate revenue
-          const revenue = calculateAppointmentRevenue(appointment)
+          // Test revenue calculation for this appointment
+          const testRevenue = calculateAppointmentRevenue(apt)
+          console.log(`📊 TEST REVENUE FOR ${apt.clientName}:`, testRevenue)
+        })
 
-          console.log(`📊 REVENUE CALCULATION RESULT:`, revenue)
+        let totalPendingRevenue = 0
+        let serviceRevenue = 0
+        let productRevenue = 0
 
-          totalPendingRevenue += revenue.total
-          serviceRevenue += revenue.serviceRevenue
-          productRevenue += revenue.productRevenue
-
-          console.log(`📊 RUNNING TOTALS:`, {
-            totalPendingRevenue,
-            serviceRevenue,
-            productRevenue
-          })
-
-          console.log(`📊 PENDING: ${appointment.clientName} - ${appointment.service}: TOTAL = ${revenue.total}`)
-        } else {
-          console.log(`📊 SKIPPED: ${appointment.clientName} - already has completed transaction`)
-        }
-      })
-
-      setPendingRevenue({
-        total: totalPendingRevenue,
-        appointmentCount: pendingAppointments.filter(apt =>
-          !transactions.find(tx =>
+        pendingAppointments.forEach(appointment => {
+          // Check if this appointment already has a completed transaction
+          const existingTransaction = transactions.find(tx =>
             tx.reference?.type === 'appointment' &&
-            tx.reference?.id === apt.id &&
+            tx.reference?.id === appointment.id &&
             tx.status === TransactionStatus.COMPLETED
           )
-        ).length,
-        serviceRevenue,
-        productRevenue
-      })
 
-      console.log('📊 PENDING REVENUE: Calculated pending revenue:', {
-        total: totalPendingRevenue,
-        appointments: pendingAppointments.length,
-        serviceRevenue,
-        productRevenue
-      })
+          // Only count revenue if no completed transaction exists
+          if (!existingTransaction) {
+            console.log(`📊 CALCULATING REVENUE FOR: ${appointment.clientName} - ${appointment.service}`)
+            console.log(`📊 APPOINTMENT DATA:`, {
+              id: appointment.id,
+              price: appointment.price,
+              priceType: typeof appointment.price,
+              service: appointment.service,
+              serviceId: appointment.serviceId,
+              status: appointment.status
+            })
+
+            // Use the helper function to calculate revenue
+            const revenue = calculateAppointmentRevenue(appointment)
+
+            console.log(`📊 REVENUE CALCULATION RESULT:`, revenue)
+
+            totalPendingRevenue += revenue.total
+            serviceRevenue += revenue.serviceRevenue
+            productRevenue += revenue.productRevenue
+
+            console.log(`📊 RUNNING TOTALS:`, {
+              totalPendingRevenue,
+              serviceRevenue,
+              productRevenue
+            })
+
+            console.log(`📊 PENDING: ${appointment.clientName} - ${appointment.service}: TOTAL = ${revenue.total}`)
+          } else {
+            console.log(`📊 SKIPPED: ${appointment.clientName} - already has completed transaction`)
+          }
+        })
+
+        setPendingRevenue({
+          total: totalPendingRevenue,
+          appointmentCount: pendingAppointments.filter(apt =>
+            !transactions.find(tx =>
+              tx.reference?.type === 'appointment' &&
+              tx.reference?.id === apt.id &&
+              tx.status === TransactionStatus.COMPLETED
+            )
+          ).length,
+          serviceRevenue,
+          productRevenue
+        })
+
+        console.log('📊 PENDING REVENUE: Calculated pending revenue:', {
+          total: totalPendingRevenue,
+          appointments: pendingAppointments.length,
+          serviceRevenue,
+          productRevenue
+        })
 
       // Debug: Log the final pending revenue state
-      console.log('📊 SETTING PENDING REVENUE STATE:', {
-        total: totalPendingRevenue,
-        appointmentCount: pendingAppointments.filter(apt =>
-          !transactions.find(tx =>
-            tx.reference?.type === 'appointment' &&
-            tx.reference?.id === apt.id &&
-            tx.status === TransactionStatus.COMPLETED
-          )
-        ).length,
-        serviceRevenue,
-        productRevenue
-      })
+        console.log('📊 SETTING PENDING REVENUE STATE:', {
+          total: totalPendingRevenue,
+          appointmentCount: pendingAppointments.filter(apt =>
+            !transactions.find(tx =>
+              tx.reference?.type === 'appointment' &&
+              tx.reference?.id === apt.id &&
+              tx.status === TransactionStatus.COMPLETED
+            )
+          ).length,
+          serviceRevenue,
+          productRevenue
+        })
 
-    } catch (error) {
-      console.error('📊 STATS CARDS: Error calculating pending revenue:', error)
-      setPendingRevenue({
-        total: 0,
-        appointmentCount: 0,
-        serviceRevenue: 0,
-        productRevenue: 0
-      })
+      } catch (error) {
+        console.error('📊 STATS CARDS: Error calculating pending revenue:', error)
+        setPendingRevenue({
+          total: 0,
+          appointmentCount: 0,
+          serviceRevenue: 0,
+          productRevenue: 0
+        })
+      }
     }
+
+    calculatePendingRevenue()
   }, [dateRange, currentLocation, transactions])
 
   // Fetch real inventory analytics
