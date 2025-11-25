@@ -810,7 +810,8 @@ export function EnhancedBookingSummary({
 
         // Create the additional service with the exact data
         const additionalService = {
-          id: service.id, // Add unique ID for the service
+          id: service.id, // Temporary UI ID for tracking
+          serviceId: service.serviceId || service.id, // Actual service ID from database
           name: service.name,
           price: service.price,
           duration: service.duration,
@@ -887,6 +888,8 @@ export function EnhancedBookingSummary({
       if (originalAppointment) {
         // Create the product with the exact data
         const newProduct = {
+          id: product.id, // Temporary UI ID for tracking
+          productId: product.productId || product.id, // Actual product ID from database
           name: product.name,
           price: product.price,
           quantity: product.quantity,

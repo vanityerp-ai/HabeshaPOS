@@ -49,7 +49,7 @@ export class ConsolidatedTransactionService {
     }
     // Determine prefix based on source
     let prefix = 'PX-';
-    if (appointment.source === 'appointment' || appointment.reference?.type === 'appointment') {
+    if (appointment.source === 'calendar' || appointment.reference?.type === 'appointment') {
       prefix = 'AP-';
     } else if (appointment.source === 'client_portal' || appointment.reference?.type === 'client_portal_order') {
       prefix = 'CP-';

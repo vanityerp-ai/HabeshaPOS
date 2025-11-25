@@ -47,35 +47,137 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load transactions from localStorage on mount
+  // Load transactions from database (SINGLE SOURCE OF TRUTH) on mount
   useEffect(() => {
-    const storedTransactions = localStorage.getItem('vanity_transactions');
-    if (storedTransactions) {
+    const loadTransactionsFromDatabase = async () => {
       try {
-        const parsedTransactions = JSON.parse(storedTransactions);
-        // Convert date strings back to Date objects
-        const transactionsWithDates = parsedTransactions.map((tx: any) => ({
-          ...tx,
-          date: new Date(tx.date),
-          createdAt: new Date(tx.createdAt),
-          updatedAt: new Date(tx.updatedAt)
-        }));
-        setTransactions(transactionsWithDates);
-        console.log('Loaded transactions from localStorage:', transactionsWithDates.length);
+        console.log('🔄 TRANSACTION PROVIDER: Loading transactions from database (single source of truth)...');
+
+        const response = await fetch('/api/transactions');
+        if (response.ok) {
+          const data = await response.json();
+          const dbTransactions = data.transactions || [];
+
+          console.log(`✅ TRANSACTION PROVIDER: Loaded ${dbTransactions.length} transactions from database`);
+
+          // Convert database transactions to the format expected by the provider
+          const convertedTransactions = dbTransactions.map((tx: any) => {
+            // Parse items if they're stored as JSON string
+            let items = tx.items;
+            if (typeof items === 'string') {
+              try {
+                items = JSON.parse(items);
+              } catch (e) {
+                items = undefined;
+              }
+            }
+
+            // Determine source from reference or type
+            let source = TransactionSource.POS; // Default to POS
+            if (tx.reference) {
+              if (tx.reference.startsWith('SALE-')) {
+                source = TransactionSource.POS;
+              } else if (tx.reference.startsWith('APPT-')) {
+                source = TransactionSource.CALENDAR;
+              } else if (tx.reference.startsWith('CP-')) {
+                source = TransactionSource.CLIENT_PORTAL;
+              }
+            }
+
+            // Extract client info from items if available
+            let clientId = undefined;
+            let clientName = undefined;
+            if (items && Array.isArray(items) && items.length > 0) {
+              // Check if items have client info
+              const firstItem = items[0];
+              if (firstItem.clientId) clientId = firstItem.clientId;
+              if (firstItem.clientName) clientName = firstItem.clientName;
+            }
+
+            // Map database transaction to provider transaction format
+            return {
+              id: tx.id,
+              date: new Date(tx.createdAt),
+              type: tx.type as TransactionType,
+              category: tx.description || 'Sale',
+              description: tx.description || '',
+              amount: Number(tx.amount),
+              paymentMethod: tx.method as PaymentMethod,
+              status: tx.status.toLowerCase() as TransactionStatus,
+              location: tx.locationId || undefined,
+              source: source,
+              clientId: clientId,
+              clientName: clientName,
+              staffId: tx.userId,
+              reference: tx.reference ? { type: 'sale', id: tx.reference } : undefined,
+              items: items,
+              serviceAmount: tx.serviceAmount ? Number(tx.serviceAmount) : undefined,
+              productAmount: tx.productAmount ? Number(tx.productAmount) : undefined,
+              discountAmount: tx.discountAmount ? Number(tx.discountAmount) : undefined,
+              createdAt: new Date(tx.createdAt),
+              updatedAt: new Date(tx.updatedAt || tx.createdAt)
+            };
+          });
+
+          setTransactions(convertedTransactions);
+
+          // Also save to localStorage as a backup
+          localStorage.setItem('vanity_transactions', JSON.stringify(convertedTransactions));
+
+        } else {
+          console.warn('⚠️ TRANSACTION PROVIDER: Failed to load from database, falling back to localStorage');
+
+          // Fallback to localStorage
+          const storedTransactions = localStorage.getItem('vanity_transactions');
+          if (storedTransactions) {
+            try {
+              const parsedTransactions = JSON.parse(storedTransactions);
+              const transactionsWithDates = parsedTransactions.map((tx: any) => ({
+                ...tx,
+                date: new Date(tx.date),
+                createdAt: new Date(tx.createdAt),
+                updatedAt: new Date(tx.updatedAt)
+              }));
+              setTransactions(transactionsWithDates);
+              console.log('Loaded transactions from localStorage:', transactionsWithDates.length);
+            } catch (error) {
+              console.error('Failed to parse stored transactions:', error);
+              setTransactions(getDefaultTransactions());
+            }
+          } else {
+            setTransactions(getDefaultTransactions());
+            console.log('No stored transactions found, initializing with empty data');
+          }
+        }
       } catch (error) {
-        console.error('Failed to parse stored transactions:', error);
-        // If parsing fails, start with default transactions
-        const defaultTransactions = getDefaultTransactions();
-        setTransactions(defaultTransactions);
-        console.log('Failed to parse stored transactions, using default data');
+        console.error('❌ TRANSACTION PROVIDER: Error loading transactions from database:', error);
+
+        // Fallback to localStorage
+        const storedTransactions = localStorage.getItem('vanity_transactions');
+        if (storedTransactions) {
+          try {
+            const parsedTransactions = JSON.parse(storedTransactions);
+            const transactionsWithDates = parsedTransactions.map((tx: any) => ({
+              ...tx,
+              date: new Date(tx.date),
+              createdAt: new Date(tx.createdAt),
+              updatedAt: new Date(tx.updatedAt)
+            }));
+            setTransactions(transactionsWithDates);
+            console.log('Loaded transactions from localStorage after error:', transactionsWithDates.length);
+          } catch (parseError) {
+            console.error('Failed to parse stored transactions:', parseError);
+            setTransactions(getDefaultTransactions());
+          }
+        } else {
+          setTransactions(getDefaultTransactions());
+        }
+      } finally {
+        setIsInitialized(true);
       }
-    } else {
-      // If no stored transactions, start with default transactions
-      const defaultTransactions = getDefaultTransactions();
-      setTransactions(defaultTransactions);
-      console.log('No stored transactions found, initializing with default data');
-    }
-    setIsInitialized(true);
+    };
+
+    loadTransactionsFromDatabase();
   }, []);
 
   // Save transactions to localStorage when they change (only after initialization)
@@ -378,7 +480,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
     // Save transaction to database
     saveTransactionToDatabase(newTransaction).catch(error => {
-      console.error('❌ Failed to save transaction to database:', error);
+      console.error('❌ Failed to save transaction to database:', {
+        error: error,
+        message: error?.message || 'Unknown error',
+        stack: error?.stack || 'No stack trace'
+      });
     });
 
     console.log('=== TRANSACTION PROVIDER: Returning transaction ===');
@@ -388,23 +494,59 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   // Helper function to save transaction to database
   const saveTransactionToDatabase = async (transaction: Transaction) => {
     try {
-      console.log('💾 Saving transaction to database:', transaction.id);
+      console.log('💾 Saving transaction to database:', {
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        clientId: transaction.clientId,
+        staffId: transaction.staffId
+      });
 
-      // Find the client's userId from clientId
-      let userId = transaction.clientId;
+      // Determine userId - we need to resolve Staff.userId or Client.userId
+      let userId: string | null = null;
 
-      // If clientId is provided but it's a Client.id (not User.id), we need to fetch the userId
-      if (transaction.clientId) {
+      // If staffId is provided, it's a StaffMember.id, we need to fetch the StaffMember to get userId
+      if (transaction.staffId) {
+        try {
+          const staffResponse = await fetch(`/api/staff/${transaction.staffId}`);
+          if (staffResponse.ok) {
+            const staffData = await staffResponse.json();
+            userId = staffData.userId;
+            console.log(`📋 Resolved userId: ${userId} from staffId: ${transaction.staffId}`);
+          } else {
+            console.warn(`⚠️ Could not fetch staff data for staffId: ${transaction.staffId}, status: ${staffResponse.status}`);
+          }
+        } catch (error) {
+          console.warn('Could not resolve userId from staffId:', error);
+        }
+      }
+
+      // If no userId from staff, try clientId
+      if (!userId && transaction.clientId) {
         try {
           const clientResponse = await fetch(`/api/clients/${transaction.clientId}`);
           if (clientResponse.ok) {
             const clientData = await clientResponse.json();
-            userId = clientData.userId || transaction.clientId;
-            console.log(`📋 Resolved userId: ${userId} for clientId: ${transaction.clientId}`);
+            userId = clientData.userId;
+            console.log(`📋 Resolved userId: ${userId} from clientId: ${transaction.clientId}`);
+          } else {
+            console.warn(`⚠️ Could not fetch client data for clientId: ${transaction.clientId}, status: ${clientResponse.status}`);
           }
         } catch (error) {
-          console.warn('Could not resolve userId from clientId, using clientId as userId');
+          console.warn('Could not resolve userId from clientId:', error);
         }
+      }
+
+      // If still no userId, skip saving to database but don't throw error
+      // The transaction is already saved to localStorage and state
+      if (!userId) {
+        console.warn('⚠️ No userId available for transaction, skipping database save:', {
+          transactionId: transaction.id,
+          clientId: transaction.clientId,
+          staffId: transaction.staffId,
+          note: 'Transaction is saved to localStorage and will be available in the UI'
+        });
+        return;
       }
 
       const response = await fetch('/api/transactions', {
@@ -422,11 +564,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
           description: transaction.description || `${transaction.category} - ${transaction.description || ''}`,
           locationId: transaction.location || null,
           appointmentId: transaction.reference?.type === 'appointment' ? transaction.reference.id : null,
-          serviceAmount: transaction.type === 'SERVICE_SALE' ? transaction.amount : null,
-          productAmount: transaction.type === 'PRODUCT_SALE' ? transaction.amount : null,
+          serviceAmount: transaction.type === 'service_sale' ? transaction.amount : transaction.serviceAmount || null,
+          productAmount: transaction.type === 'product_sale' ? transaction.amount : transaction.productAmount || null,
           originalServiceAmount: transaction.metadata?.originalServiceAmount || null,
           discountPercentage: transaction.metadata?.discountPercentage || null,
-          discountAmount: transaction.metadata?.discountAmount || null,
+          discountAmount: transaction.metadata?.discountAmount || transaction.discountAmount || null,
           items: transaction.items || []
         }),
       });
@@ -438,17 +580,26 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         } catch (e) {
           errorDetails = await response.text();
         }
-        console.error('❌ Failed to save transaction to database:', {
+        const errorMessage = `Failed to save transaction to database: ${response.status} ${response.statusText}`;
+        console.error('❌ ' + errorMessage, {
           status: response.status,
           statusText: response.statusText,
-          error: errorDetails
+          error: errorDetails,
+          transactionId: transaction.id,
+          userId: userId
         });
+        throw new Error(errorMessage + ' - ' + JSON.stringify(errorDetails));
       } else {
         const result = await response.json();
         console.log('✅ Transaction saved to database:', result.transaction?.id);
       }
-    } catch (error) {
-      console.error('❌ Error saving transaction to database:', error);
+    } catch (error: any) {
+      console.error('❌ Error saving transaction to database:', {
+        message: error?.message || 'Unknown error',
+        error: error,
+        transactionId: transaction.id,
+        stack: error?.stack
+      });
       throw error; // Re-throw to be caught by the outer catch
     }
   };
@@ -738,81 +889,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Sync POS sales from Prisma to transactions after initialization
-  useEffect(() => {
-    if (isInitialized) {
-      console.log('🔄 TRANSACTION PROVIDER: Running POS sales sync from Prisma');
-      
-      // Run the sync with a delay to ensure everything is loaded
-      setTimeout(async () => {
-        try {
-          const response = await fetch('/api/transactions');
-          if (response.ok) {
-            const data = await response.json();
-            const prismaTransactions = data.transactions || [];
-            
-            // Filter only POS sales that are not already in our provider
-            const existingIds = new Set(transactions.map(tx => tx.id));
-            const posSalesToSync = prismaTransactions.filter((tx: any) => {
-              // Only sync if it's a POS sale (has locationId and reference starts with SALE-)
-              return tx.reference?.startsWith('SALE-') && 
-                     tx.locationId && 
-                     !existingIds.has(tx.id) &&
-                     !transactions.some(existing => existing.reference === tx.reference);
-            });
-            
-            if (posSalesToSync.length > 0) {
-              console.log(`📊 TRANSACTION PROVIDER: Found ${posSalesToSync.length} POS sales to sync from Prisma`);
-              
-              let syncedCount = 0;
-              for (const prismaTx of posSalesToSync) {
-                try {
-                  const convertedTx = {
-                    id: prismaTx.id,
-                    type: prismaTx.type || 'product_sale',
-                    description: prismaTx.description || `POS Sale`,
-                    amount: Number(prismaTx.amount),
-                    date: new Date(prismaTx.createdAt),
-                    status: prismaTx.status?.toLowerCase() || 'completed',
-                    source: 'pos', // Mark as POS source
-                    location: prismaTx.locationId,
-                    reference: prismaTx.reference,
-                    method: prismaTx.method || 'cash',
-                    clientId: undefined,
-                    clientName: undefined,
-                    staffId: prismaTx.userId,
-                    staffName: undefined,
-                    items: prismaTx.items ? JSON.parse(prismaTx.items) : [],
-                    metadata: {
-                      prismaId: prismaTx.id,
-                      serviceAmount: prismaTx.serviceAmount ? Number(prismaTx.serviceAmount) : undefined,
-                      productAmount: prismaTx.productAmount ? Number(prismaTx.productAmount) : undefined,
-                      discountAmount: prismaTx.discountAmount ? Number(prismaTx.discountAmount) : undefined,
-                      isPosSale: true
-                    }
-                  };
-                  
-                  const added = addTransaction(convertedTx);
-                  if (added) {
-                    syncedCount++;
-                    console.log(`✅ Synced POS sale ${prismaTx.id} from Prisma`);
-                  }
-                } catch (error) {
-                  console.error(`⚠️ Failed to sync POS sale ${prismaTx.id}:`, error);
-                }
-              }
-              
-              if (syncedCount > 0) {
-                console.log(`✅ TRANSACTION PROVIDER: Synced ${syncedCount} POS sales from Prisma`);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('❌ TRANSACTION PROVIDER: Error during POS sales sync:', error);
-        }
-      }, 2000);
-    }
-  }, [isInitialized, transactions]);
+  // NOTE: POS sales sync is no longer needed as we now load all transactions from database on initial load
 
   const value = {
     transactions,

@@ -285,9 +285,11 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
         throw new Error("Service or staff not found")
       }
 
-      // Create the service object with a unique ID
+      // Create the service object with a unique ID for UI tracking
+      // but also include the actual serviceId for database persistence
       const newService = {
         id: `service-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        serviceId: serviceDetails.id, // Add the actual service ID from the database
         type: "service",
         name: serviceDetails.name,
         price: serviceDetails.price,

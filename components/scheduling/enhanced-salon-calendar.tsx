@@ -322,7 +322,9 @@ export function EnhancedSalonCalendar({
     appointments.forEach(appointment => {
       if (appointment.additionalServices && appointment.additionalServices.length > 0) {
         appointment.additionalServices.forEach((service: any) => {
-          if (service.staffId && service.staffId !== appointment.staffId) {
+          // Display additional service on the grid if it has a staff assigned
+          // This makes the staff unavailable and shows the booking details
+          if (service.staffId) {
             // Create a new appointment-like object for this additional service
             allAppointments.push({
               id: `${appointment.id}-service-${service.id || Date.now()}`,
@@ -338,7 +340,8 @@ export function EnhancedSalonCalendar({
               price: service.price,
               isAdditionalService: true,
               parentAppointmentId: appointment.id,
-              additionalServiceInfo: `Additional service for ${appointment.clientName}`
+              additionalServiceInfo: `Additional service for ${appointment.clientName}`,
+              completed: service.completed || false
             });
           }
         });

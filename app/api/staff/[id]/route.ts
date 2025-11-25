@@ -2,6 +2,53 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateStaffServices } from '@/lib/services/staff';
 
+/**
+ * GET /api/staff/[id]
+ *
+ * Get a single staff member by ID
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    console.log(`GET /api/staff/${id} - Fetching staff member`);
+
+    // Find the staff member with user data
+    const staff = await prisma.staffMember.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        locations: {
+          include: {
+            location: true
+          }
+        }
+      }
+    });
+
+    if (!staff) {
+      console.log(`Staff member with ID ${id} not found in database`);
+      return NextResponse.json(
+        { error: 'Staff member not found' },
+        { status: 404 }
+      );
+    }
+
+    console.log(`Found staff member: ${staff.name} (userId: ${staff.userId})`);
+
+    return NextResponse.json(staff);
+  } catch (error) {
+    console.error('Error fetching staff member:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch staff member' },
+      { status: 500 }
+    );
+  }
+}
+
 // Map staff roles to UserRole enum values
 function mapStaffRoleToUserRole(staffRole: string): string {
   const roleMapping: { [key: string]: string } = {

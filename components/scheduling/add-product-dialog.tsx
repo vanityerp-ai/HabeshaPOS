@@ -74,9 +74,11 @@ export function AddProductDialog({ open, onOpenChange, bookingId, onProductAdded
       if (!productDetails) {
         throw new Error("Product not found")
       }
-      // Create the product object
+      // Create the product object with a unique ID for UI tracking
+      // but also include the actual productId for database persistence
       const newProduct = {
         id: `product-${Date.now()}`,
+        productId: productDetails.id, // Add the actual product ID from the database
         type: "product",
         name: productDetails.name,
         price: productDetails.price * quantity,

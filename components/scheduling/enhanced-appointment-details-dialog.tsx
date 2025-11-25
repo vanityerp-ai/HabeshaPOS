@@ -655,7 +655,7 @@ export function EnhancedAppointmentDetailsDialog({
                                   <TooltipTrigger asChild>
                                     <div className="flex items-center gap-1 mt-1 cursor-help">
                                       <span className="text-xs text-muted-foreground">
-                                        {format(parseISO(showTimestamp), "dd-MM-yyyy HH:mm")}
+                                        {format(parseISO(showTimestamp), "HH:mm")}
                                       </span>
                                       <Info className="h-3 w-3 text-muted-foreground" />
                                     </div>
@@ -667,7 +667,7 @@ export function EnhancedAppointmentDetailsDialog({
                               </TooltipProvider>
                             ) : (
                               <span className="text-xs text-muted-foreground mt-1">
-                                {format(parseISO(showTimestamp), "dd-MM-yyyy HH:mm")}
+                                {format(parseISO(showTimestamp), "HH:mm")}
                               </span>
                             )
                           )}

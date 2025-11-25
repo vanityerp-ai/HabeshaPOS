@@ -106,7 +106,7 @@ export default function AppointmentsPage() {
       }
 
       // Create consolidated transaction using the new service
-      const appointmentWithSource = { ...appointment, source: 'appointment' };
+      const appointmentWithSource = { ...appointment, source: 'calendar' };
       const consolidatedTransaction = ConsolidatedTransactionService.createConsolidatedTransaction(
         appointmentWithSource,
         PaymentMethod.CASH, // Default payment method for appointments page
@@ -439,6 +439,8 @@ export default function AppointmentsPage() {
             // Use the deduplication utility to validate transaction creation
             // (already checked above)
             console.log("=== CALLING recordAppointmentTransaction (with amount, no duplicates found) ===");
+            // Actually call the function to record the transaction
+            recordAppointmentTransaction(updatedAppointment);
           } else {
             console.log("=== SKIPPING transaction recording (no amount) ===");
             toast({
@@ -529,11 +531,13 @@ export default function AppointmentsPage() {
       return;
     }
 
-    console.log("AppointmentsPage: Added new appointment via service", appointmentWithHistory.id);
+    // Use the appointment returned from the API (with real database ID) instead of the temporary one
+    const createdAppointment = result.appointment!;
+    console.log("AppointmentsPage: Added new appointment via service", createdAppointment.id);
 
-    // Update the state with the new appointment
-    const updatedAppointments = [...appointments, appointmentWithHistory];
-    setAppointments(updatedAppointments);
+    // Refresh appointments from database to ensure we have the real IDs
+    // This prevents issues with temporary IDs being used in subsequent updates
+    await loadAppointments();
 
     // Different toast message based on appointment type
     if (newAppointment.type === "blocked") {

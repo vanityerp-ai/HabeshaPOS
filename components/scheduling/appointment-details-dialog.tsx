@@ -85,7 +85,8 @@ export function AppointmentDetailsDialog({
       })
 
       setIsUpdating(false)
-      onOpenChange(false)
+      // Keep the dialog open so the user can see the updated status history
+      // The parent component will update the appointment prop with the new status history
     } catch (error) {
       console.error("Failed to update appointment:", error)
       toast({
@@ -216,7 +217,7 @@ export function AppointmentDetailsDialog({
                     {history.updatedBy && <span className="text-sm text-muted-foreground">by {history.updatedBy}</span>}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {format(parseISO(history.timestamp), "dd-MM-yyyy HH:mm")}
+                    {format(parseISO(history.timestamp), "HH:mm")}
                   </span>
                 </div>
               ))}
