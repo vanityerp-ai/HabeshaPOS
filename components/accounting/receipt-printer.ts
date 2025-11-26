@@ -27,20 +27,26 @@ export function printReceipt(transaction: Transaction, getLocationName?: (id: st
   // Format items if available
   let itemsHtml = '';
   if (transaction.items && transaction.items.length > 0) {
+    // Use transaction-level discount percentage for consistency
+    const transactionDiscountPercentage = transaction.discountPercentage || 0;
+    
     itemsHtml = transaction.items.map(function (item) {
+      // Show discount only for items that have discount applied (services)
+      const itemDiscount = item.discountApplied && item.type === 'service' ? transactionDiscountPercentage : 0;
+      
       return `
         <div style="display: flex; font-size: 12px; border-bottom: 1px dashed #aaa;">
           <div style="flex: 2;">${item.name}</div>
           <div style="flex: 1;">${item.type}</div>
           <div style="flex: 1; text-align: right;">QAR ${item.originalPrice ?? '-'}</div>
-          <div style="flex: 1; text-align: right;">${item.discountApplied ? (item.discountPercentage || 0) + '%' : '-'}</div>
+          <div style="flex: 1; text-align: right;">${itemDiscount > 0 ? itemDiscount + '%' : '-'}</div>
           <div style="flex: 1; text-align: right;">QAR ${item.totalPrice}</div>
         </div>
         <div style="display: flex; font-size: 11px; direction: rtl; border-bottom: 1px dashed #aaa;">
           <div style="flex: 2;">${toPhoneticArabic(item.name)}</div>
           <div style="flex: 1;">${toPhoneticArabic(item.type)}</div>
           <div style="flex: 1; text-align: left;">${item.originalPrice ? toArabicNumber(item.originalPrice) + ' ر.ق' : '-'}</div>
-          <div style="flex: 1; text-align: left;">${item.discountApplied ? toArabicNumber(item.discountPercentage || 0) + '٪' : '-'}</div>
+          <div style="flex: 1; text-align: left;">${itemDiscount > 0 ? toArabicNumber(itemDiscount) + '٪' : '-'}</div>
           <div style="flex: 1; text-align: left;">${item.totalPrice ? toArabicNumber(item.totalPrice) + ' ر.ق' : '-'}</div>
         </div>
       `;
@@ -57,7 +63,7 @@ export function printReceipt(transaction: Transaction, getLocationName?: (id: st
   const receiptHtml = `
     <html>
       <head>
-        <title>Receipt - ${transaction.id}</title>
+        <title>${companyName} - ${transaction.id}</title>
         <style>
           body { width: 300px; font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 0 auto; }
           .header { text-align: center; margin-bottom: 8px; }
