@@ -9,7 +9,13 @@ import { SettingsStorage } from "@/lib/settings-storage"
 export function printReceipt(transaction: Transaction, getLocationName?: (id: string) => string): void {
   // Get branding name from settings
   const settings = SettingsStorage.getGeneralSettings();
-  const companyName = settings.branding?.companyName || settings.businessName || "Vanity Hub";
+  // Try branding.companyName first, then businessName, then default
+  let companyName = "Vanity Hub";
+  if (settings.branding && settings.branding.companyName && settings.branding.companyName.trim() !== "") {
+    companyName = settings.branding.companyName;
+  } else if (settings.businessName && settings.businessName.trim() !== "" && settings.businessName !== "Vanity Hub") {
+    companyName = settings.businessName;
+  }
   // Helper for Arabic numerals
   function toArabicNumber(num: number | string) {
     return String(num).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
