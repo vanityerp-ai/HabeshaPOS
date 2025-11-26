@@ -533,7 +533,10 @@ export function Transactions({
                 // Calculate revenue breakdown for display
                 const serviceRevenue = calculateServiceRevenue(transaction);
                 const productRevenue = calculateProductRevenue(transaction);
-                const originalAmount = transaction.originalServiceAmount ?? 0; // Changed to use originalServiceAmount and default to 0
+                // Calculate original amount: if originalServiceAmount exists, use it + productAmount, else use transaction.amount
+                const originalAmount = transaction.originalServiceAmount 
+                  ? (Number(transaction.originalServiceAmount) + (transaction.productAmount ? Number(transaction.productAmount) : 0))
+                  : transaction.amount;
                 const finalAmount = transaction.amount;
 
                 return (

@@ -999,11 +999,9 @@ export function EnhancedBookingSummary({
         paymentMethodEnum = PaymentMethod.MOBILE_PAYMENT;
       }
 
-      // Calculate service and product amounts from bookingForPayment.items
-      const serviceAmount = bookingForPayment.items.filter(item => item.type === 'service').reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
-      const productAmount = bookingForPayment.items.filter(item => item.type === 'product').reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
-      // Calculate original service amount before discount
-      const originalServiceAmount = bookingForPayment.items.filter(item => item.type === 'service').reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+      // Create consolidated transaction with correct discount calculations
+      // Note: Do NOT override serviceAmount, productAmount, or originalServiceAmount
+      // as createConsolidatedTransactionFromBooking already calculates them correctly with discounts applied
       const consolidatedTransaction = {
         ...ConsolidatedTransactionService.createConsolidatedTransactionFromBooking(
           bookingForPayment,
@@ -1013,9 +1011,6 @@ export function EnhancedBookingSummary({
           serviceDiscountAmount
         ),
         id: generateSequentialTransactionId('TX-'),
-        serviceAmount,
-        productAmount,
-        originalServiceAmount,
       };
 
       console.log('📊 BOOKING SUMMARY: Creating consolidated transaction:', {

@@ -720,9 +720,17 @@ export default function AccountingPage() {
                             ) : ''}
                           </td>
                           <td className="px-2 py-2">
-                            {tx.originalServiceAmount && tx.originalServiceAmount !== tx.serviceAmount ? (
-                              <span className="line-through">QAR {tx.originalServiceAmount}</span>
-                            ) : ''}
+                            {tx.originalServiceAmount && Number(tx.originalServiceAmount) > 0 ? (
+                              tx.discountPercentage && Number(tx.discountPercentage) > 0 ? (
+                                <span className="line-through text-gray-500">QAR {Number(tx.originalServiceAmount).toFixed(2)}</span>
+                              ) : (
+                                <span>QAR {Number(tx.originalServiceAmount).toFixed(2)}</span>
+                              )
+                            ) : (
+                              tx.serviceAmount && Number(tx.serviceAmount) > 0 ? (
+                                <span>QAR {Number(tx.serviceAmount).toFixed(2)}</span>
+                              ) : ''
+                            )}
                           </td>
                           <td className="px-2 py-2 font-bold">QAR {tx.amount}</td>
                           <td className="px-2 py-2 whitespace-nowrap">{tx.paymentMethod}</td>

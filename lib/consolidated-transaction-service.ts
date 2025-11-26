@@ -252,6 +252,11 @@ export class ConsolidatedTransactionService {
 
     // Process booking items
     if (booking.items && booking.items.length > 0) {
+      // First pass: calculate total service amount to distribute discount proportionally
+      const totalServicePrice = booking.items
+        .filter((item: any) => (item.type || 'service') === 'service')
+        .reduce((sum: number, item: any) => sum + item.price, 0);
+
       booking.items.forEach((item: any) => {
         const transactionItem: TransactionItem = {
           id: item.id || `item-${item.name.toLowerCase().replace(/\s+/g, '-')}`,
@@ -268,13 +273,14 @@ export class ConsolidatedTransactionService {
 
         // Apply discount only to services
         if (transactionItem.type === 'service') {
-          if (serviceDiscountAmount && serviceDiscountAmount > 0) {
-            // Use serviceDiscountAmount if provided
+          if (serviceDiscountAmount && serviceDiscountAmount > 0 && totalServicePrice > 0) {
+            // Distribute the serviceDiscountAmount proportionally across all services
+            const proportionalDiscount = (item.price / totalServicePrice) * serviceDiscountAmount;
             transactionItem.discountApplied = true;
-            transactionItem.discountAmount = serviceDiscountAmount;
-            transactionItem.totalPrice = item.price - serviceDiscountAmount;
+            transactionItem.discountAmount = proportionalDiscount;
+            transactionItem.totalPrice = item.price - proportionalDiscount;
             // Calculate equivalent percentage for display
-            transactionItem.discountPercentage = (serviceDiscountAmount / item.price) * 100;
+            transactionItem.discountPercentage = (proportionalDiscount / item.price) * 100;
           } else if (discountPercentage && discountPercentage > 0) {
             // Fall back to percentage discount if no serviceDiscountAmount
             const itemDiscountAmount = (item.price * discountPercentage) / 100;
