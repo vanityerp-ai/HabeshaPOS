@@ -122,6 +122,11 @@ export async function POST(request: Request) {
 
       const locationName = location?.name || data.locationId;
 
+      // Calculate original service amount before discount
+      const serviceAmountBeforeDiscount = hasServices ? data.items
+        .filter((item: any) => item.type === "service")
+        .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) : null;
+
       await prisma.transaction.create({
         data: {
           userId: data.staffId,
@@ -129,15 +134,16 @@ export async function POST(request: Request) {
           type: transactionType,
           status: data.paymentStatus === "paid" ? "completed" : data.paymentStatus === "partial" ? "partial" : "pending",
           method: data.paymentMethod || "cash",
+          source: "POS", // Add source field for proper categorization
           reference: `SALE-${sale.id}`,
           description: `POS Sale - ${data.items.length} item(s)`,
           locationId: data.locationId,
-          serviceAmount: hasServices ? data.items
-            .filter((item: any) => item.type === "service")
-            .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) : null,
+          serviceAmount: serviceAmountBeforeDiscount,
           productAmount: hasProducts ? data.items
             .filter((item: any) => item.type === "product")
             .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) : null,
+          originalServiceAmount: serviceAmountBeforeDiscount, // Original amount before discount
+          discountPercentage: data.discountPercentage || null, // Discount percentage if provided
           discountAmount: discountAmount || null,
           items: JSON.stringify(data.items)
         }

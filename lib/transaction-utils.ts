@@ -328,10 +328,22 @@ export function generateTransactionIdWithPrefix(prefix: string): string {
   return `${prefix}${numStr}`;
 }
 
-// Global sequential transaction ID generator
+// Global sequential transaction ID generator with timestamp to ensure uniqueness
 let transactionSequence = 1;
+let lastTimestamp = Date.now();
+
 export function generateSequentialTransactionId(prefix: string = 'TX-'): string {
-  const id = `${prefix}${transactionSequence.toString().padStart(6, '0')}`;
+  const currentTimestamp = Date.now();
+  
+  // Reset sequence if more than 1 second has passed (ensures uniqueness across page reloads)
+  if (currentTimestamp !== lastTimestamp) {
+    lastTimestamp = currentTimestamp;
+    transactionSequence = 1;
+  }
+  
+  // Use timestamp + sequence to create a unique ID that won't conflict
+  // Format: TX-{timestamp}-{sequence}
+  const id = `${prefix}${currentTimestamp}-${transactionSequence}`;
   transactionSequence++;
   return id;
 }

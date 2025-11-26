@@ -87,37 +87,71 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform to match frontend format
-    const transformedAppointments = appointments.map(appointment => ({
-      id: appointment.id,
-      bookingReference: appointment.bookingReference,
-      clientId: appointment.clientId,
-      clientName: appointment.client.clientProfile?.name || "Unknown",
-      staffId: appointment.staffId,
-      staffName: appointment.staff.name,
-      service: appointment.services[0]?.service.name || "",
-      serviceId: appointment.services[0]?.serviceId || "",
-      date: appointment.date.toISOString(),
-      duration: appointment.duration,
-      location: appointment.locationId,
-      locationName: appointment.location.name,
-      price: Number(appointment.totalPrice),
-      notes: appointment.notes,
-      status: appointment.status,
-      createdAt: appointment.createdAt.toISOString(),
-      updatedAt: appointment.updatedAt.toISOString(),
-      additionalServices: appointment.services.slice(1).map(s => ({
-        id: s.serviceId,
-        name: s.service.name,
-        price: Number(s.price),
-        duration: s.duration
-      })),
-      products: appointment.products.map(p => ({
-        id: p.productId,
-        name: p.product.name,
-        price: Number(p.price),
-        quantity: p.quantity
-      }))
-    }));
+    const transformedAppointments = appointments.map(appointment => {
+      // Parse statusHistory from JSON string if it exists
+      let statusHistory = [];
+      if ((appointment as any).statusHistory) {
+        try {
+          statusHistory = typeof (appointment as any).statusHistory === 'string'
+            ? JSON.parse((appointment as any).statusHistory)
+            : (appointment as any).statusHistory;
+        } catch (e) {
+          console.error('Failed to parse statusHistory:', e);
+          statusHistory = [];
+        }
+      }
+
+      // If no status history exists, create initial entry from createdAt
+      if (statusHistory.length === 0) {
+        statusHistory = [{
+          status: 'pending',
+          timestamp: appointment.createdAt.toISOString(),
+          updatedBy: 'System'
+        }];
+      }
+
+      return {
+        id: appointment.id,
+        bookingReference: appointment.bookingReference,
+        clientId: appointment.clientId,
+        clientName: appointment.client.clientProfile?.name || "Unknown",
+        staffId: appointment.staffId,
+        staffName: appointment.staff.name,
+        service: appointment.services[0]?.service.name || "",
+        serviceId: appointment.services[0]?.serviceId || "",
+        date: appointment.date.toISOString(),
+        duration: appointment.duration,
+        location: appointment.locationId,
+        locationName: appointment.location.name,
+        price: Number(appointment.totalPrice),
+        notes: appointment.notes,
+        status: appointment.status,
+        statusHistory: statusHistory,
+        // Payment fields
+        paymentStatus: (appointment as any).paymentStatus,
+        paymentMethod: (appointment as any).paymentMethod,
+        paymentDate: (appointment as any).paymentDate?.toISOString(),
+        discountPercentage: (appointment as any).discountPercentage ? Number((appointment as any).discountPercentage) : undefined,
+        discountAmount: (appointment as any).discountAmount ? Number((appointment as any).discountAmount) : undefined,
+        originalAmount: (appointment as any).originalAmount ? Number((appointment as any).originalAmount) : undefined,
+        finalAmount: (appointment as any).finalAmount ? Number((appointment as any).finalAmount) : undefined,
+        transactionRecorded: (appointment as any).transactionRecorded,
+        createdAt: appointment.createdAt.toISOString(),
+        updatedAt: appointment.updatedAt.toISOString(),
+        additionalServices: appointment.services.slice(1).map(s => ({
+          id: s.serviceId,
+          name: s.service.name,
+          price: Number(s.price),
+          duration: s.duration
+        })),
+        products: appointment.products.map(p => ({
+          id: p.productId,
+          name: p.product.name,
+          price: Number(p.price),
+          quantity: p.quantity
+        }))
+      };
+    });
 
     console.log(`API: Retrieved ${transformedAppointments.length} appointments from database`);
     
@@ -133,7 +167,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/appointments
- * 
+ *
  * Create a new appointment in database with change tracking
  */
 export async function POST(request: NextRequest) {
@@ -141,10 +175,51 @@ export async function POST(request: NextRequest) {
     const currentUser = getUserFromHeaders(request);
     const data = await request.json();
 
+    console.log("📅 Creating appointment with data:", JSON.stringify(data, null, 2));
+
     // Generate booking reference if not provided
     const bookingReference = data.bookingReference || `VH-${Date.now().toString().slice(-6)}`;
 
-    // Create appointment in database
+    // Build the services array for creation
+    const servicesToCreate: { serviceId: string; price: number; duration: number }[] = [];
+
+    // Add main service if provided
+    if (data.serviceId) {
+      servicesToCreate.push({
+        serviceId: data.serviceId,
+        price: data.price || 0,
+        duration: data.duration || 0
+      });
+      console.log("📦 Adding main service:", data.serviceId);
+    }
+
+    // Add additional services if provided
+    if (data.additionalServices && Array.isArray(data.additionalServices) && data.additionalServices.length > 0) {
+      console.log("📦 Processing additional services:", data.additionalServices.length);
+      for (const additionalService of data.additionalServices) {
+        const serviceId = additionalService.serviceId || additionalService.id;
+        // Skip if no valid service ID or if it's a temp ID
+        if (!serviceId || serviceId.startsWith('temp-') || serviceId.startsWith('service-')) {
+          console.log("⚠️ Skipping invalid service ID:", serviceId);
+          continue;
+        }
+        // Skip if it's the same as the main service
+        if (serviceId === data.serviceId) {
+          console.log("⚠️ Skipping duplicate main service:", serviceId);
+          continue;
+        }
+        servicesToCreate.push({
+          serviceId: serviceId,
+          price: additionalService.price || 0,
+          duration: additionalService.duration || 0
+        });
+        console.log("📦 Adding additional service:", serviceId, additionalService.name);
+      }
+    }
+
+    console.log("📦 Total services to create:", servicesToCreate.length);
+
+    // Create appointment in database with all services
     const appointment = await prisma.appointment.create({
       data: {
         bookingReference,
@@ -155,7 +230,12 @@ export async function POST(request: NextRequest) {
         duration: data.duration,
         totalPrice: data.price || data.totalPrice || 0,
         status: data.status || "PENDING",
-        notes: data.notes
+        notes: data.notes,
+        statusHistory: data.statusHistory ? JSON.stringify(data.statusHistory) : undefined,
+        // Create all services (main + additional) in one go
+        services: servicesToCreate.length > 0 ? {
+          create: servicesToCreate
+        } : undefined
       },
       include: {
         client: {
@@ -168,21 +248,18 @@ export async function POST(request: NextRequest) {
         },
         location: {
           select: { name: true }
+        },
+        services: {
+          include: {
+            service: {
+              select: { id: true, name: true, duration: true }
+            }
+          }
         }
       }
     });
 
-    // Create service relationship if service provided
-    if (data.serviceId || data.service) {
-      await prisma.appointmentService.create({
-        data: {
-          appointmentId: appointment.id,
-          serviceId: data.serviceId,
-          price: data.price || 0,
-          duration: data.duration
-        }
-      });
-    }
+    console.log("✅ Appointment created with", appointment.services.length, "services");
 
     // Track change for real-time sync
     await trackChange({
@@ -193,6 +270,15 @@ export async function POST(request: NextRequest) {
       userId: currentUser?.id
     });
 
+    // Transform additional services for response
+    const additionalServicesResponse = appointment.services.slice(1).map(as => ({
+      id: as.id,
+      serviceId: as.serviceId,
+      name: as.service.name,
+      price: Number(as.price),
+      duration: as.duration || as.service.duration
+    }));
+
     // Transform response
     const transformed = {
       id: appointment.id,
@@ -202,8 +288,8 @@ export async function POST(request: NextRequest) {
       staffId: appointment.staffId,
       staffName: appointment.staff.name,
       staffColor: appointment.staff.color,
-      service: data.service,
-      serviceId: data.serviceId,
+      service: appointment.services[0]?.service.name || data.service,
+      serviceId: appointment.services[0]?.serviceId || data.serviceId,
       date: appointment.date.toISOString(),
       duration: appointment.duration,
       location: appointment.locationId,
@@ -212,10 +298,12 @@ export async function POST(request: NextRequest) {
       notes: appointment.notes,
       status: appointment.status,
       createdAt: appointment.createdAt.toISOString(),
-      updatedAt: appointment.updatedAt.toISOString()
+      updatedAt: appointment.updatedAt.toISOString(),
+      // Include additional services in response
+      additionalServices: additionalServicesResponse
     };
 
-    console.log("API: Created appointment", transformed.id);
+    console.log("API: Created appointment", transformed.id, "with", additionalServicesResponse.length, "additional services");
 
     return NextResponse.json({
       success: true,
@@ -223,8 +311,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating appointment:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create appointment" },
+      { error: "Failed to create appointment", message: errorMessage },
       { status: 500 }
     );
   }

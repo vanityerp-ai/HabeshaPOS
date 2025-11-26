@@ -43,6 +43,7 @@ import {
 import { useTransactions } from "@/lib/transaction-provider"
 import { useStaff } from "@/lib/use-staff-data"
 import { type Transaction, type TransactionSource } from "@/lib/transaction-types"
+import { SettingsStorage } from "@/lib/settings-storage"
 
 
 // Accounting-specific report types
@@ -88,6 +89,10 @@ export default function AccountingPage() {
 
   // Handler for printing receipt (placeholder)
   const handlePrintReceipt = (tx: Transaction) => {
+    // Get branding name from settings
+    const settings = SettingsStorage.getGeneralSettings();
+    const companyName = settings.branding?.companyName || settings.businessName || "Vanity Hub";
+    
     // Generate bilingual, thermal-printer-friendly receipt HTML
     const itemsHtml = (tx.items || []).map(function(item) {
       return `
@@ -135,9 +140,7 @@ export default function AccountingPage() {
         </head>
         <body>
           <div class="header">
-            <div class="title">Vanity Hub</div>
-            <div class="subtitle">Receipt</div>
-            <div class="subtitle-ar">فاتورة</div>
+            <div class="title">${companyName}</div>
           </div>
           <div class="info">
             <div><span class="label">Transaction ID:</span> ${tx.id}</div>

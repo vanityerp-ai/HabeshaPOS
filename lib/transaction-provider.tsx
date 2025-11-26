@@ -72,12 +72,14 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
               }
             }
 
-            // Determine source from reference or type
-            let source = TransactionSource.POS; // Default to POS
-            if (tx.reference) {
+            // Determine source - use the source field from database if available
+            let source = tx.source || TransactionSource.POS; // Default to POS if not set
+
+            // Fallback: Determine source from reference or type if source field is not set
+            if (!tx.source && tx.reference) {
               if (tx.reference.startsWith('SALE-')) {
                 source = TransactionSource.POS;
-              } else if (tx.reference.startsWith('APPT-')) {
+              } else if (tx.reference.startsWith('APPT-') || tx.reference.startsWith('AP-')) {
                 source = TransactionSource.CALENDAR;
               } else if (tx.reference.startsWith('CP-')) {
                 source = TransactionSource.CLIENT_PORTAL;
@@ -113,7 +115,15 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
               items: items,
               serviceAmount: tx.serviceAmount ? Number(tx.serviceAmount) : undefined,
               productAmount: tx.productAmount ? Number(tx.productAmount) : undefined,
+              originalServiceAmount: tx.originalServiceAmount ? Number(tx.originalServiceAmount) : undefined,
+              discountPercentage: tx.discountPercentage ? Number(tx.discountPercentage) : undefined,
               discountAmount: tx.discountAmount ? Number(tx.discountAmount) : undefined,
+              metadata: {
+                discountApplied: tx.discountPercentage && Number(tx.discountPercentage) > 0,
+                discountPercentage: tx.discountPercentage ? Number(tx.discountPercentage) : undefined,
+                discountAmount: tx.discountAmount ? Number(tx.discountAmount) : undefined,
+                originalServiceAmount: tx.originalServiceAmount ? Number(tx.originalServiceAmount) : undefined,
+              },
               createdAt: new Date(tx.createdAt),
               updatedAt: new Date(tx.updatedAt || tx.createdAt)
             };
@@ -498,6 +508,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         id: transaction.id,
         type: transaction.type,
         amount: transaction.amount,
+        source: transaction.source,
         clientId: transaction.clientId,
         staffId: transaction.staffId
       });
@@ -505,19 +516,35 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       // Determine userId - we need to resolve Staff.userId or Client.userId
       let userId: string | null = null;
 
-      // If staffId is provided, it's a StaffMember.id, we need to fetch the StaffMember to get userId
+      // If staffId is provided, it could be:
+      // 1. A StaffMember.id (from appointments) - need to fetch to get userId
+      // 2. A User.id directly (from POS) - can be used directly
       if (transaction.staffId) {
-        try {
-          const staffResponse = await fetch(`/api/staff/${transaction.staffId}`);
-          if (staffResponse.ok) {
-            const staffData = await staffResponse.json();
-            userId = staffData.userId;
-            console.log(`📋 Resolved userId: ${userId} from staffId: ${transaction.staffId}`);
-          } else {
-            console.warn(`⚠️ Could not fetch staff data for staffId: ${transaction.staffId}, status: ${staffResponse.status}`);
+        // For POS transactions, the staffId is actually the User.id from auth
+        if (transaction.source === TransactionSource.POS) {
+          userId = transaction.staffId;
+          console.log(`📋 Using staffId directly as userId for POS transaction: ${userId}`);
+        } else {
+          // For non-POS transactions (appointments), staffId is a StaffMember.id
+          try {
+            const staffResponse = await fetch(`/api/staff/${transaction.staffId}`);
+            if (staffResponse.ok) {
+              const staffData = await staffResponse.json();
+              userId = staffData.userId;
+              console.log(`📋 Resolved userId: ${userId} from staffId: ${transaction.staffId}`);
+            } else if (staffResponse.status === 404) {
+              // Not found as staff member, use staffId as userId directly (fallback)
+              userId = transaction.staffId;
+              console.log(`📋 StaffMember not found, using staffId as userId: ${userId}`);
+            } else {
+              console.warn(`⚠️ Could not fetch staff data for staffId: ${transaction.staffId}, status: ${staffResponse.status}`);
+            }
+          } catch (error) {
+            console.warn('Could not resolve userId from staffId:', error);
+            // Fallback to using staffId as userId
+            userId = transaction.staffId;
+            console.log(`📋 Using staffId as userId (fallback): ${userId}`);
           }
-        } catch (error) {
-          console.warn('Could not resolve userId from staffId:', error);
         }
       }
 
@@ -527,8 +554,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
           const clientResponse = await fetch(`/api/clients/${transaction.clientId}`);
           if (clientResponse.ok) {
             const clientData = await clientResponse.json();
-            userId = clientData.userId;
-            console.log(`📋 Resolved userId: ${userId} from clientId: ${transaction.clientId}`);
+            // The client API returns 'client' object which has a 'user' field if the client is linked to a user
+            userId = clientData.client?.userId || clientData.userId;
+            if (userId) {
+              console.log(`📋 Resolved userId: ${userId} from clientId: ${transaction.clientId}`);
+            }
           } else {
             console.warn(`⚠️ Could not fetch client data for clientId: ${transaction.clientId}, status: ${clientResponse.status}`);
           }
@@ -544,6 +574,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
           transactionId: transaction.id,
           clientId: transaction.clientId,
           staffId: transaction.staffId,
+          source: transaction.source,
           note: 'Transaction is saved to localStorage and will be available in the UI'
         });
         return;
@@ -560,15 +591,16 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
           type: transaction.type,
           status: transaction.status,
           method: transaction.paymentMethod,
+          source: transaction.source || null,
           reference: transaction.reference?.id || null,
           description: transaction.description || `${transaction.category} - ${transaction.description || ''}`,
           locationId: transaction.location || null,
           appointmentId: transaction.reference?.type === 'appointment' ? transaction.reference.id : null,
           serviceAmount: transaction.type === 'service_sale' ? transaction.amount : transaction.serviceAmount || null,
           productAmount: transaction.type === 'product_sale' ? transaction.amount : transaction.productAmount || null,
-          originalServiceAmount: transaction.metadata?.originalServiceAmount || null,
-          discountPercentage: transaction.metadata?.discountPercentage || null,
-          discountAmount: transaction.metadata?.discountAmount || transaction.discountAmount || null,
+          originalServiceAmount: transaction.originalServiceAmount || transaction.metadata?.originalServiceAmount || null,
+          discountPercentage: transaction.discountPercentage || transaction.metadata?.discountPercentage || null,
+          discountAmount: transaction.discountAmount || transaction.metadata?.discountAmount || null,
           items: transaction.items || []
         }),
       });

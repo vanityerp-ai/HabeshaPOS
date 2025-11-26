@@ -83,6 +83,7 @@ export async function POST(request: Request) {
         type: data.type,
         status: data.status,
         method: data.method,
+        source: data.source || null,
         reference: data.reference || null,
         description: data.description || null,
         locationId: data.locationId || null,

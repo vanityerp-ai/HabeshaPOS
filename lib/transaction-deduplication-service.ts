@@ -34,6 +34,12 @@ export class TransactionDeduplicationService {
       return true // Allow recording on server side
     }
 
+    // For POS transactions without reference IDs, always allow (they have unique timestamp-based IDs)
+    if (transaction.source === TransactionSource.POS && !transaction.reference?.id) {
+      console.log(`✅ DEDUPLICATION: POS transaction ${transaction.id} approved (no reference ID)`)
+      return true
+    }
+
     // Check if transaction is already processed
     if (this.processedTransactions.has(transaction.id)) {
       console.log(`🔄 DEDUPLICATION: Transaction ${transaction.id} already processed, skipping`)

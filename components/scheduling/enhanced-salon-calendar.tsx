@@ -326,6 +326,12 @@ export function EnhancedSalonCalendar({
           // This makes the staff unavailable and shows the booking details
           if (service.staffId) {
             // Create a new appointment-like object for this additional service
+            // IMPORTANT: Set status to "service-started" if the service is not completed,
+            // even if the parent appointment has a "completed" status.
+            // This ensures the additional service remains visible on the calendar
+            // until it is explicitly marked as completed.
+            const serviceStatus = service.completed ? "completed" : "service-started";
+            
             allAppointments.push({
               id: `${appointment.id}-service-${service.id || Date.now()}`,
               clientId: appointment.clientId,
@@ -336,7 +342,7 @@ export function EnhancedSalonCalendar({
               staffId: service.staffId,
               staffName: service.staffName,
               location: appointment.location,
-              status: appointment.status,
+              status: serviceStatus, // Use service-specific status instead of parent status
               price: service.price,
               isAdditionalService: true,
               parentAppointmentId: appointment.id,
@@ -919,6 +925,13 @@ export function EnhancedSalonCalendar({
 
   // Handle booking update from summary view
   const handleBookingUpdate = (updatedBooking: any) => {
+    console.log("🟢 EnhancedSalonCalendar: handleBookingUpdate called", {
+      isArray: Array.isArray(updatedBooking),
+      hasOnAppointmentUpdated: !!onAppointmentUpdated,
+      bookingId: updatedBooking?.id,
+      additionalServicesCount: updatedBooking?.additionalServices?.length
+    });
+
     if (onAppointmentUpdated) {
       // Check if this is a single appointment update or a full array
       if (Array.isArray(updatedBooking)) {
@@ -927,14 +940,17 @@ export function EnhancedSalonCalendar({
         const updatedBookingJSON = JSON.stringify(updatedBooking);
 
         if (currentAppointmentsJSON !== updatedBookingJSON) {
-          console.log("Appointments array has changed, notifying parent component");
+          console.log("🟢 EnhancedSalonCalendar: Appointments array has changed, notifying parent component");
           onAppointmentUpdated(updatedBooking);
         }
       } else {
         // For single appointment updates, we can pass it directly
         // The parent component will handle merging it with the existing appointments
+        console.log("🟢 EnhancedSalonCalendar: Passing single appointment update to parent");
         onAppointmentUpdated(updatedBooking);
       }
+    } else {
+      console.error("❌ EnhancedSalonCalendar: onAppointmentUpdated callback is not defined!");
     }
   }
 

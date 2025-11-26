@@ -228,6 +228,20 @@ model Appointment {
   totalPrice       Decimal           // Specify precision for monetary values
   status           String            @default("PENDING") // AppointmentStatus @default(PENDING)
   notes            String?           // Using Text type for potentially long content
+
+  // Payment fields
+  paymentStatus    String?           // Payment status: 'paid', 'pending', 'partial'
+  paymentMethod    String?           // Payment method used
+  paymentDate      DateTime?         // When payment was made
+  discountPercentage Decimal?        // Discount percentage applied
+  discountAmount   Decimal?          // Discount amount applied
+  originalAmount   Decimal?          // Original amount before discount
+  finalAmount      Decimal?          // Final amount after discount
+  transactionRecorded Boolean?       @default(false) // Flag to prevent duplicate transaction creation
+
+  // Status history - JSON array of status changes with timestamps
+  statusHistory    String?           // JSON array: [{status: string, timestamp: string, updatedBy: string}]
+
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -477,6 +491,7 @@ model Transaction {
   type          String            // TransactionType
   status        String            @default("PENDING") // TransactionStatus @default(PENDING)
   method        String            // PaymentMethod
+  source        String?           // TransactionSource (POS, CALENDAR, CLIENT_PORTAL, etc.)
   reference     String?
   description   String?
   locationId    String?

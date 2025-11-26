@@ -360,6 +360,7 @@ export default function POSPage() {
           id: generateSequentialTransactionId('TX-'),
           clientId: selectedClient?.id,
           clientName: selectedClient?.name || "Walk-in Customer",
+          staffId: user?.id, // Add staffId for database save
           type: "product_sale" as TransactionType,
           category: "Product Sale",
           description: productDescriptions,
@@ -369,8 +370,12 @@ export default function POSPage() {
           paymentMethod: paymentMethodEnum,
           status: TransactionStatus.COMPLETED,
           location: currentLocation || "loc1",
-          date: new Date().toISOString(),
+          date: new Date(),
           source: TransactionSource.POS,
+          // Include discount information
+          discountPercentage: discountPercentage || 0,
+          discountAmount: discountAmount || 0,
+          originalServiceAmount: productTotal, // For products, original = amount
           items: productItems.map(item => ({
             id: item.id,
             name: item.name,
@@ -379,8 +384,12 @@ export default function POSPage() {
             quantity: item.quantity,
             type: 'product' as const
           })),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          metadata: {
+            discountApplied: (discountPercentage || 0) > 0,
+            discountPercentage: discountPercentage || 0,
+            discountAmount: discountAmount || 0,
+            isPosSale: true
+          }
         };
         transactions.push(productTransaction);
         console.log('[POS] Created product transaction:', productTransaction);
@@ -395,6 +404,7 @@ export default function POSPage() {
           id: generateSequentialTransactionId('TX-'),
           clientId: selectedClient?.id,
           clientName: selectedClient?.name || "Walk-in Customer",
+          staffId: user?.id, // Add staffId for database save
           type: "service_sale" as TransactionType,
           category: "Service Sale",
           description: `POS Service Sale - ${serviceItems.length} service${serviceItems.length > 1 ? 's' : ''}`,
@@ -404,8 +414,12 @@ export default function POSPage() {
           paymentMethod: paymentMethodEnum,
           status: TransactionStatus.COMPLETED,
           location: currentLocation || "loc1",
-          date: new Date().toISOString(),
+          date: new Date(),
           source: TransactionSource.POS,
+          // Include discount information for services
+          discountPercentage: discountPercentage || 0,
+          discountAmount: serviceDiscountAmount || 0,
+          originalServiceAmount: serviceTotal + (serviceDiscountAmount || 0), // Original before discount
           items: serviceItems.map(item => ({
             id: item.id,
             name: item.name,
@@ -414,8 +428,12 @@ export default function POSPage() {
             quantity: item.quantity,
             type: 'service' as const
           })),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          metadata: {
+            discountApplied: (discountPercentage || 0) > 0,
+            discountPercentage: discountPercentage || 0,
+            discountAmount: serviceDiscountAmount || 0,
+            isPosSale: true
+          }
         };
         transactions.push(serviceTransaction);
         console.log('[POS] Created service transaction:', serviceTransaction);

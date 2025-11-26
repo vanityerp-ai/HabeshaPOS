@@ -317,7 +317,16 @@ export async function updateAppointment(appointmentId: string, updates: Partial<
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update appointment');
+      // Try to get more error details from the response
+      let errorDetails = '';
+      try {
+        const errorData = await response.json();
+        errorDetails = errorData.message || errorData.error || '';
+        console.error('AppointmentService: Update failed with details:', errorData);
+      } catch (e) {
+        console.error('AppointmentService: Could not parse error response');
+      }
+      throw new Error(`Failed to update appointment${errorDetails ? ': ' + errorDetails : ''}`);
     }
 
     const data = await response.json();

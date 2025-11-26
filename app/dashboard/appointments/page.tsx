@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { EnhancedSalonCalendar } from "@/components/scheduling/enhanced-salon-calendar"
 import { EnhancedAppointmentDetailsDialog } from "@/components/scheduling/enhanced-appointment-details-dialog"
 import { useToast } from "@/components/ui/use-toast"
@@ -38,7 +38,9 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
 
-
+  // Ref to track pending updates - prevents polling from overwriting local state
+  // while an API call is in progress
+  const pendingUpdatesRef = useRef<Set<string>>(new Set())
 
   // Load services on component mount
   useEffect(() => {
@@ -256,6 +258,13 @@ export default function AppointmentsPage() {
   // Set up real-time sync for appointments
   useEntityChanges('Appointment', (change) => {
     console.log("🔄 Appointment change detected:", change);
+
+    // Check if there are pending updates - if so, skip this poll to avoid overwriting local state
+    if (pendingUpdatesRef.current.size > 0) {
+      console.log("⏳ Skipping poll - pending updates in progress:", Array.from(pendingUpdatesRef.current));
+      return;
+    }
+
     // Invalidate cache and reload appointments
     invalidateAppointmentsCache();
     loadAppointments();
@@ -465,22 +474,26 @@ export default function AppointmentsPage() {
     }
 
     // Use the appointment service to update the appointment
+    // Only send the fields that need to be updated (status and statusHistory)
     const appointmentToUpdate = updatedAppointments.find(a => a.id === appointmentId);
     if (appointmentToUpdate) {
-      updateAppointment(appointmentId, appointmentToUpdate).catch(error => {
+      // Send minimal update data to avoid issues with existing services/products
+      const updateData = {
+        status: appointmentToUpdate.status,
+        statusHistory: appointmentToUpdate.statusHistory
+      };
+      updateAppointment(appointmentId, updateData).catch(error => {
         console.error("Error updating appointment:", error);
       });
       console.log("AppointmentsPage: Updated appointment status via service", appointmentId, newStatus);
     }
 
     // Clear the justUpdated flag after animation completes
+    // Note: justUpdated is a UI-only flag, no need to update the database
     setTimeout(() => {
       const animationClearedAppointments = updatedAppointments.map((appointment) => {
         if (appointment.id === appointmentId) {
-          const clearedAppointment = { ...appointment, justUpdated: false };
-          // Update in the appointment service
-          updateAppointment(appointmentId, clearedAppointment);
-          return clearedAppointment;
+          return { ...appointment, justUpdated: false };
         }
         return appointment;
       });
@@ -580,12 +593,24 @@ export default function AppointmentsPage() {
     // Handle single appointment update
     const updatedAppointment = updatedAppointmentData;
 
-    console.log("📥 AppointmentsPage: Received single appointment update", {
+    // Determine the type of update
+    const updateType = updatedAppointment.justUpdated ? 'SERVICE_OR_PRODUCT_ADDED' :
+                       updatedAppointment.paymentStatus ? 'PAYMENT_UPDATE' :
+                       'STATUS_OR_OTHER_UPDATE';
+
+    console.log(`🟡 AppointmentsPage: Received single appointment update [${updateType}]`, {
       appointmentId: updatedAppointment.id,
       clientName: updatedAppointment.clientName,
       paymentStatus: updatedAppointment.paymentStatus,
       paymentMethod: updatedAppointment.paymentMethod,
-      status: updatedAppointment.status
+      status: updatedAppointment.status,
+      justUpdated: updatedAppointment.justUpdated,
+      additionalServicesCount: updatedAppointment.additionalServices?.length || 0,
+      additionalServices: updatedAppointment.additionalServices?.map((s: any) => ({
+        id: s.id,
+        serviceId: s.serviceId,
+        name: s.name
+      }))
     });
 
     // Update the appointment in the list, carefully preserving any additional services or products
@@ -615,8 +640,81 @@ export default function AppointmentsPage() {
 
     // Update the appointment in the appointment service
     if (updatedAppointment.id) {
-      updateAppointment(updatedAppointment.id, updatedAppointment);
-      console.log("AppointmentsPage: Updated appointment via service", updatedAppointment.id);
+      // Create a clean update object without additionalServices and products
+      // to avoid unique constraint violations when they already exist in the database
+      const { additionalServices, products, ...updateData } = updatedAppointment;
+
+      // Debug: Log the raw additionalServices array
+      console.log("🔍 DEBUG: Raw additionalServices from updatedAppointment:", additionalServices);
+      console.log("🔍 DEBUG: additionalServices is array:", Array.isArray(additionalServices));
+      console.log("🔍 DEBUG: additionalServices length:", additionalServices?.length);
+      if (additionalServices && additionalServices.length > 0) {
+        console.log("🔍 DEBUG: First service id:", additionalServices[0]?.id);
+        console.log("🔍 DEBUG: First service id starts with 'service-':", additionalServices[0]?.id?.startsWith('service-'));
+      }
+
+      // Check if there are new additional services (with temp IDs like 'service-xxx')
+      const hasNewServices = additionalServices && additionalServices.some((s: any) =>
+        s.id?.startsWith('service-') || s.id?.startsWith('temp-')
+      );
+
+      // Check if there are new products (with temp IDs like 'product-xxx')
+      const hasNewProducts = products && products.some((p: any) =>
+        p.id?.startsWith('product-') || p.id?.startsWith('temp-')
+      );
+
+      // Generate a unique update ID for tracking
+      const updateId = `update-${Date.now()}`;
+
+      console.log(`📦 [${updateId}] handleAppointmentUpdated - checking for new items:`, {
+        hasNewServices,
+        hasNewProducts,
+        additionalServicesCount: additionalServices?.length || 0,
+        productsCount: products?.length || 0,
+        additionalServices: additionalServices?.map((s: any) => ({ id: s.id, serviceId: s.serviceId, name: s.name })),
+        justUpdated: updatedAppointment.justUpdated
+      });
+
+      // Only include additionalServices and products if they contain new items
+      const cleanUpdateData = {
+        ...updateData,
+        ...(hasNewServices ? { additionalServices } : {}),
+        ...(hasNewProducts ? { products } : {})
+      };
+
+      console.log(`📤 [${updateId}] Sending update to API - hasNewServices: ${hasNewServices}, hasNewProducts: ${hasNewProducts}`);
+      console.log(`📤 [${updateId}] cleanUpdateData keys:`, Object.keys(cleanUpdateData));
+
+      // Add to pending updates to prevent polling from overwriting local state
+      pendingUpdatesRef.current.add(updatedAppointment.id);
+      console.log(`🔒 [${updateId}] Added to pending updates:`, updatedAppointment.id);
+
+      // Make the API call and handle errors
+      updateAppointment(updatedAppointment.id, cleanUpdateData)
+        .then((result) => {
+          if (result) {
+            console.log("✅ AppointmentsPage: Update successful", result);
+            // Reload appointments to get the latest data from the database
+            loadAppointments();
+          } else {
+            console.error("❌ AppointmentsPage: Update returned null");
+          }
+        })
+        .catch((error) => {
+          console.error("❌ AppointmentsPage: Update failed:", error);
+          toast({
+            variant: "destructive",
+            title: "Failed to save",
+            description: "Could not save the additional service/product. Please try again.",
+          });
+        })
+        .finally(() => {
+          // Remove from pending updates after the API call completes
+          pendingUpdatesRef.current.delete(updatedAppointment.id);
+          console.log(`🔓 [${updateId}] Removed from pending updates:`, updatedAppointment.id);
+        });
+
+      console.log("AppointmentsPage: Update request sent for appointment", updatedAppointment.id);
     }
 
     // Update state

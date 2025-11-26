@@ -1,11 +1,15 @@
 "use client"
 
 import { Transaction } from "@/lib/transaction-types"
+import { SettingsStorage } from "@/lib/settings-storage"
 
 /**
  * Print a bilingual (English/Arabic) receipt for a transaction
  */
 export function printReceipt(transaction: Transaction, getLocationName?: (id: string) => string): void {
+  // Get branding name from settings
+  const settings = SettingsStorage.getGeneralSettings();
+  const companyName = settings.branding?.companyName || settings.businessName || "Vanity Hub";
   // Helper for Arabic numerals
   function toArabicNumber(num: number | string) {
     return String(num).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
@@ -72,9 +76,7 @@ export function printReceipt(transaction: Transaction, getLocationName?: (id: st
       </head>
       <body>
         <div class="header">
-          <div class="title">Vanity Hub</div>
-          <div class="subtitle">Receipt</div>
-          <div class="subtitle-ar">فاتورة</div>
+          <div class="title">${companyName}</div>
         </div>
         <div class="info">
           <div><span class="label">Transaction ID:</span> ${transaction.id}</div>

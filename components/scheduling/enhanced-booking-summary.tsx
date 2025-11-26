@@ -35,6 +35,8 @@ interface BookingItem {
   price: number
   staff?: string
   staffId?: string
+  serviceId?: string    // Actual database service ID (for services)
+  productId?: string    // Actual database product ID (for products)
   duration?: number
   quantity?: number
   unitPrice?: number
@@ -771,13 +773,14 @@ export function EnhancedBookingSummary({
   }
 
   // Handle service added
-  const handleServiceAdded = (bookingId: string, service: BookingItem) => {
+  const handleServiceAdded = (bookingId: string, service: any) => {
     console.log("handleServiceAdded called with:", { bookingId, service });
 
     // Set the updating flag to prevent infinite loops
     isUpdatingRef.current = true;
 
     // Create a new service item with the exact data from the dialog
+    // IMPORTANT: Include serviceId for database persistence
     const newServiceItem: BookingItem = {
       id: service.id,
       type: "service",
@@ -785,10 +788,11 @@ export function EnhancedBookingSummary({
       price: service.price,
       duration: service.duration,
       staff: service.staff,
-      staffId: service.staffId
+      staffId: service.staffId,
+      serviceId: service.serviceId  // The actual database service ID
     };
 
-    console.log("Created new service item:", newServiceItem);
+    console.log("Created new service item with serviceId:", newServiceItem);
 
     // Update the bookings state with the new service
     const updatedBookings = bookings.map((booking) =>
@@ -828,22 +832,31 @@ export function EnhancedBookingSummary({
         console.log("Created additional service for appointment:", additionalService);
 
         // Update the appointment with the new service
-        // Use setTimeout to ensure this happens after the current render cycle
-        setTimeout(() => {
-          const updatedAppointment = {
-            ...originalAppointment,
-            // Add the new service to the appointment
-            additionalServices: [
-              ...(originalAppointment.additionalServices || []),
-              additionalService,
-            ],
-            // Flag to indicate this appointment was just updated (for UI highlighting)
-            justUpdated: true
-          };
+        // Call the callback immediately (no setTimeout to avoid stale closures)
+        const updatedAppointment = {
+          ...originalAppointment,
+          // Add the new service to the appointment
+          additionalServices: [
+            ...(originalAppointment.additionalServices || []),
+            additionalService,
+          ],
+          // Flag to indicate this appointment was just updated (for UI highlighting)
+          justUpdated: true
+        };
 
-          console.log("Updating appointment with:", updatedAppointment);
+        console.log("🔵 EnhancedBookingSummary: Updating appointment with additional service:", {
+          appointmentId: updatedAppointment.id,
+          additionalServicesCount: updatedAppointment.additionalServices?.length,
+          newService: additionalService,
+          hasOnBookingUpdate: !!onBookingUpdate
+        });
+
+        if (onBookingUpdate) {
+          console.log("🔵 EnhancedBookingSummary: Calling onBookingUpdate callback");
           onBookingUpdate(updatedAppointment);
-        }, 50);
+        } else {
+          console.error("❌ EnhancedBookingSummary: onBookingUpdate callback is not defined!");
+        }
 
         // Show a toast notification with the specific service details
         toast({
@@ -859,19 +872,23 @@ export function EnhancedBookingSummary({
   }
 
   // Handle product added
-  const handleProductAdded = (bookingId: string, product: BookingItem) => {
+  const handleProductAdded = (bookingId: string, product: any) => {
     // Set the updating flag to prevent infinite loops
     isUpdatingRef.current = true;
 
     // Create a new product item with the exact data from the dialog
+    // IMPORTANT: Include productId for database persistence
     const newProductItem: BookingItem = {
       id: product.id,
       type: "product",
       name: product.name,
       price: product.price,
       quantity: product.quantity,
-      unitPrice: product.unitPrice
+      unitPrice: product.unitPrice,
+      productId: product.productId  // The actual database product ID
     };
+
+    console.log("handleProductAdded: Created new product item with productId:", newProductItem);
 
     // Update the bookings state with the new product
     const updatedBookings = bookings.map((booking) =>
@@ -897,17 +914,31 @@ export function EnhancedBookingSummary({
         };
 
         // Update the appointment with the new product
-        // Use setTimeout to ensure this happens after the current render cycle
-        setTimeout(() => {
-          onBookingUpdate({
-            ...originalAppointment,
-            // Add the new product to the appointment
-            products: [
-              ...(originalAppointment.products || []),
-              newProduct,
-            ],
-          });
-        }, 0);
+        // Call the callback immediately (no setTimeout to avoid stale closures)
+        const updatedAppointment = {
+          ...originalAppointment,
+          // Add the new product to the appointment
+          products: [
+            ...(originalAppointment.products || []),
+            newProduct,
+          ],
+          // Flag to indicate this appointment was just updated
+          justUpdated: true
+        };
+
+        console.log("🔵 EnhancedBookingSummary: Updating appointment with product:", {
+          appointmentId: updatedAppointment.id,
+          productsCount: updatedAppointment.products?.length,
+          newProduct: newProduct,
+          hasOnBookingUpdate: !!onBookingUpdate
+        });
+
+        if (onBookingUpdate) {
+          console.log("🔵 EnhancedBookingSummary: Calling onBookingUpdate callback for product");
+          onBookingUpdate(updatedAppointment);
+        } else {
+          console.error("❌ EnhancedBookingSummary: onBookingUpdate callback is not defined!");
+        }
 
         // Show a toast notification with the specific product details
         toast({
@@ -996,8 +1027,13 @@ export function EnhancedBookingSummary({
         itemCount: consolidatedTransaction.items?.length || 0
       });
 
+      console.log('🔍 BOOKING SUMMARY: About to call addTransaction with:', consolidatedTransaction);
+      console.log('🔍 BOOKING SUMMARY: addTransaction function exists?', typeof addTransaction === 'function');
+
       // Add the consolidated transaction
       const result = addTransaction(consolidatedTransaction);
+
+      console.log('🔍 BOOKING SUMMARY: addTransaction returned:', result);
 
       if (result) {
         setLastTransaction(consolidatedTransaction); // Store for print receipt

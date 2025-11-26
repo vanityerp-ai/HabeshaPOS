@@ -141,6 +141,7 @@ export class ConsolidatedTransactionService {
 
     // Calculate total amount
     const totalAmount = serviceAmount + productAmount;
+    const originalTotal = originalServiceAmount + productAmount;
 
     // Determine transaction type
     const transactionType = items.some(item => item.type === 'service') && items.some(item => item.type === 'product')
@@ -212,7 +213,7 @@ export class ConsolidatedTransactionService {
       productAmount,
       originalServiceAmount,
       discountPercentage,
-      discountAmount,
+      discountAmount: discountPercentage && discountPercentage > 0 ? (originalServiceAmount * discountPercentage / 100) : 0,
       metadata: {
         appointmentId: appointment.id,
         transactionType: 'consolidated',
@@ -221,6 +222,9 @@ export class ConsolidatedTransactionService {
         phone: appointment.clientPhone || '', // Store client phone for matching
         email: appointment.clientEmail || '', // Store client email for matching
         discountApplied: discountPercentage && discountPercentage > 0,
+        discountPercentage: discountPercentage || 0,
+        discountAmount: discountPercentage && discountPercentage > 0 ? (originalServiceAmount * discountPercentage / 100) : 0,
+        originalTotal: originalTotal,
         finalTotal: totalAmount
       },
       createdAt: new Date(),
@@ -294,6 +298,10 @@ export class ConsolidatedTransactionService {
 
     // Calculate total amount
     const totalAmount = serviceAmount + productAmount;
+    const originalTotal = originalServiceAmount + productAmount;
+
+    // Calculate actual discount amount based on the service discount
+    const actualDiscountAmount = serviceDiscountAmount || (discountPercentage && discountPercentage > 0 ? (originalServiceAmount * discountPercentage / 100) : 0);
 
     // Determine transaction type
     const transactionType = items.some(item => item.type === 'service') && items.some(item => item.type === 'product')
@@ -361,14 +369,17 @@ export class ConsolidatedTransactionService {
       productAmount,
       originalServiceAmount,
       discountPercentage,
-      discountAmount,
+      discountAmount: actualDiscountAmount,
       metadata: {
         bookingId: booking.id,
         transactionType: 'consolidated',
         serviceCount,
         productCount,
         discountApplied: discountPercentage && discountPercentage > 0,
-        originalTotal: originalServiceAmount + productAmount,
+        discountPercentage: discountPercentage || 0,
+        discountAmount: actualDiscountAmount,
+        originalTotal: originalTotal,
+        finalTotal: totalAmount
       },
       createdAt: new Date(),
       updatedAt: new Date()
