@@ -675,10 +675,75 @@ export default function AppointmentsPage() {
         justUpdated: updatedAppointment.justUpdated
       });
 
+      // If there are new additional services, create separate appointments for them
+      if (hasNewServices) {
+        const newServices = additionalServices.filter((s: any) =>
+          s.id?.startsWith('service-') || s.id?.startsWith('temp-')
+        );
+
+        console.log(`📅 [${updateId}] Creating ${newServices.length} separate appointments for additional services`);
+
+        // Find the parent appointment to get client info
+        const parentAppointment = appointments.find(a => a.id === updatedAppointment.id);
+
+        if (parentAppointment) {
+          // Create separate appointment for each new additional service
+          for (const service of newServices) {
+            const additionalServiceAppointment = {
+              id: `add-service-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              clientId: parentAppointment.clientId,
+              clientName: parentAppointment.clientName,
+              clientEmail: parentAppointment.clientEmail,
+              staffId: service.staffId,
+              staffName: service.staffName,
+              service: service.name,
+              serviceId: service.serviceId,
+              date: service.date || parentAppointment.date,
+              duration: service.duration || 30,
+              location: parentAppointment.location,
+              price: service.price,
+              notes: `Additional service for ${parentAppointment.clientName}`,
+              status: service.status || parentAppointment.status || 'confirmed',
+              type: 'regular',
+              isAdditionalService: true,
+              parentAppointmentId: parentAppointment.id,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            console.log(`📅 [${updateId}] Creating additional service appointment:`, {
+              id: additionalServiceAppointment.id,
+              service: additionalServiceAppointment.service,
+              staff: additionalServiceAppointment.staffName,
+              date: additionalServiceAppointment.date
+            });
+
+            // Create the appointment in the database
+            try {
+              await addAppointmentWithValidation(additionalServiceAppointment);
+              console.log(`✅ [${updateId}] Additional service appointment created successfully`);
+            } catch (error) {
+              console.error(`❌ [${updateId}] Failed to create additional service appointment:`, error);
+              toast({
+                variant: "destructive",
+                title: "Failed to create additional service appointment",
+                description: `Could not create calendar appointment for ${service.name}`,
+              });
+            }
+          }
+
+          // After creating separate appointments, refresh the appointments list
+          setTimeout(() => {
+            loadAppointments();
+          }, 500);
+        }
+      }
+
       // Only include additionalServices and products if they contain new items
+      // Note: We don't include additionalServices here anymore since they're created as separate appointments
       const cleanUpdateData = {
         ...updateData,
-        ...(hasNewServices ? { additionalServices } : {}),
+        // Don't include additionalServices - they're now separate appointments
         ...(hasNewProducts ? { products } : {})
       };
 

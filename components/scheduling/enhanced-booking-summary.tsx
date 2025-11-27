@@ -812,7 +812,7 @@ export function EnhancedBookingSummary({
       if (originalAppointment) {
         console.log("Found original appointment:", originalAppointment);
 
-        // Create the additional service with the exact data
+        // Create the additional service with the exact data needed for calendar display
         const additionalService = {
           id: service.id, // Temporary UI ID for tracking
           serviceId: service.serviceId || service.id, // Actual service ID from database
@@ -825,8 +825,15 @@ export function EnhancedBookingSummary({
           date: originalAppointment.date,
           // Mark this as an additional service for the parent appointment
           parentAppointmentId: originalAppointment.id,
-          // Set the status to match the parent appointment
-          status: originalAppointment.status
+          isAdditionalService: true,
+          // Set the status to match the parent appointment (default to service-started if parent is in progress)
+          status: originalAppointment.status === 'service-started' ? 'service-started' : originalAppointment.status,
+          // Include location for proper calendar placement
+          location: originalAppointment.location,
+          // Include client info for the calendar display
+          clientId: originalAppointment.clientId,
+          clientName: originalAppointment.clientName,
+          clientEmail: originalAppointment.clientEmail
         };
 
         console.log("Created additional service for appointment:", additionalService);
