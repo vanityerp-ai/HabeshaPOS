@@ -295,7 +295,7 @@ export const entitySchemas = {
     lastName: baseSchemas.name,
     email: baseSchemas.email,
     phone: baseSchemas.phone,
-    role: z.enum(['STAFF', 'MANAGER', 'ADMIN']),
+    role: z.enum(['STAFF', 'MANAGER', 'ADMIN', 'SALES', 'RECEPTIONIST', 'LOCATION_MANAGER']),
     locationIds: z.array(baseSchemas.uuid).min(1, 'At least one location is required'),
     specialties: z.array(baseSchemas.uuid).optional(),
     isActive: z.boolean().default(true),

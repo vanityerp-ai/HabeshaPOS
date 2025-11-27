@@ -157,7 +157,7 @@
 }
 
 .scrollbar-thumb-border::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsla(var(--muted-foreground), 0.3);
 }
 
 /* Ensure scrollbar appears below content with proper spacing */
@@ -172,7 +172,7 @@
 }
 
 .dark .scrollbar-thumb-border::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.4);
+  background: hsla(var(--muted-foreground), 0.4);
 }
 
 /* Currency-specific styles */

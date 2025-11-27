@@ -34,7 +34,8 @@ export async function GET(
           include: {
             service: {
               select: { id: true, name: true, duration: true }
-            }
+            },
+            staff: true
           }
         },
         products: {
@@ -105,12 +106,17 @@ export async function GET(
       originalAmount: appointment.originalAmount ? Number(appointment.originalAmount) : undefined,
       finalAmount: appointment.finalAmount ? Number(appointment.finalAmount) : undefined,
       transactionRecorded: appointment.transactionRecorded,
-      additionalServices: appointment.services.slice(1).map(s => ({
-        id: s.serviceId,
-        name: s.service.name,
-        price: Number(s.price),
-        duration: s.duration
-      })),
+      additionalServices: appointment.services.slice(1).map(s => {
+        return {
+          id: s.serviceId,
+          serviceId: s.serviceId,
+          name: s.service.name,
+          price: Number(s.price),
+          duration: s.duration,
+          staffId: s.staffId,
+          staffName: s.staff?.name || null
+        };
+      }),
       products: appointment.products.map(p => ({
         id: p.productId,
         name: p.product.name,
@@ -319,16 +325,31 @@ export async function PUT(
       console.log('📦 Services to add after filtering:', servicesToAdd.length);
 
       if (servicesToAdd.length > 0) {
+        console.log('📋 Services to add:', JSON.stringify(servicesToAdd, null, 2));
+        
         updateData.services = {
           create: servicesToAdd.map((service: any) => {
-            console.log('  ✅ Adding service:', service.name, 'serviceId:', service.serviceId);
-            return {
+            const serviceData = {
               serviceId: service.serviceId,
+              staffId: service.staffId || null, // Store staff assignment in database
               price: service.price || 0,
               duration: service.duration || 0
             };
+            
+            console.log('  ✅ Creating AppointmentService:', {
+              serviceName: service.name,
+              serviceId: serviceData.serviceId,
+              staffId: serviceData.staffId,
+              staffName: service.staffName,
+              price: serviceData.price,
+              duration: serviceData.duration
+            });
+            
+            return serviceData;
           })
         };
+        
+        console.log('✅ Staff assignments will be stored in AppointmentService table');
       }
     }
 
@@ -395,7 +416,8 @@ export async function PUT(
             include: {
               service: {
                 select: { id: true, name: true, duration: true }
-              }
+              },
+              staff: true
             }
           },
           products: {
@@ -477,14 +499,17 @@ export async function PUT(
       originalAmount: updatedAppointment.originalAmount ? Number(updatedAppointment.originalAmount) : undefined,
       finalAmount: updatedAppointment.finalAmount ? Number(updatedAppointment.finalAmount) : undefined,
       transactionRecorded: updatedAppointment.transactionRecorded,
-      additionalServices: updatedAppointment.services.slice(1).map(s => ({
-        id: s.serviceId,
-        name: s.service.name,
-        price: Number(s.price),
-        duration: s.duration,
-        staffId: s.service.id,
-        staffName: s.service.name
-      })),
+      additionalServices: updatedAppointment.services.slice(1).map(s => {
+        return {
+          id: s.serviceId,
+          serviceId: s.serviceId,
+          name: s.service.name,
+          price: Number(s.price),
+          duration: s.duration,
+          staffId: s.staffId,
+          staffName: s.staff?.name || null
+        };
+      }),
       products: updatedAppointment.products.map(p => ({
         id: p.productId,
         name: p.product.name,

@@ -76,8 +76,11 @@ interface EnhancedBooking {
 // Convert appointments to enhanced bookings with items
 // This function needs to be called with the getLocationName function, staff data, and services data
 const getEnhancedBookings = (appointments: any[] = [], locationNameFn: (id: string) => string, staffData: any[] = [], servicesData: any[] = []) => {
-  // Filter out reflected appointments (blocking appointments) from booking summary
-  const nonReflectedAppointments = appointments.filter(appointment => !appointment.isReflected)
+  // Filter out reflected appointments and visual blocking entries from booking summary
+  // These are visual-only calendar entries and shouldn't appear as separate bookings
+  const nonReflectedAppointments = appointments.filter(appointment => 
+    !appointment.isReflected && !appointment.isVisualBlockingOnly
+  )
 
   return nonReflectedAppointments.map((appointment) => {
     // Handle blocked time entries differently

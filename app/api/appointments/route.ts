@@ -72,7 +72,8 @@ export async function GET(request: NextRequest) {
           include: {
             service: {
               select: { id: true, name: true, duration: true }
-            }
+            },
+            staff: true
           }
         },
         products: {
@@ -138,12 +139,17 @@ export async function GET(request: NextRequest) {
         transactionRecorded: (appointment as any).transactionRecorded,
         createdAt: appointment.createdAt.toISOString(),
         updatedAt: appointment.updatedAt.toISOString(),
-        additionalServices: appointment.services.slice(1).map(s => ({
-          id: s.serviceId,
-          name: s.service.name,
-          price: Number(s.price),
-          duration: s.duration
-        })),
+        additionalServices: appointment.services.slice(1).map(s => {
+          return {
+            id: s.serviceId,
+            serviceId: s.serviceId,
+            name: s.service.name,
+            price: Number(s.price),
+            duration: s.duration,
+            staffId: s.staffId,
+            staffName: s.staff?.name || null
+          };
+        }),
         products: appointment.products.map(p => ({
           id: p.productId,
           name: p.product.name,

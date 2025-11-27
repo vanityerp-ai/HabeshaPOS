@@ -294,12 +294,20 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
         name: serviceDetails.name,
         price: serviceDetails.price,
         duration: serviceDetails.duration,
-        staff: staffDetails.name,
         staffId: staffDetails.id,
+        staffName: staffDetails.name, // Use staffName to match API expectations
       }
 
       // Log the service being added for debugging
-      console.log("Adding service:", newService);
+      console.log("✅ AddServiceDialog: Adding service with staff assignment:", {
+        id: newService.id,
+        serviceId: newService.serviceId,
+        name: newService.name,
+        staffId: newService.staffId,
+        staffName: newService.staffName,
+        price: newService.price,
+        duration: newService.duration
+      });
 
       // Call the callback to add the service
       onServiceAdded(bookingId, newService)

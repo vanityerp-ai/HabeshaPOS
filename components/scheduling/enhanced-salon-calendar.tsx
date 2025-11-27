@@ -1939,7 +1939,7 @@ export function EnhancedSalonCalendar({
                                   <div className="space-y-1 max-h-[150px] overflow-y-auto">
                                     {earlyAppointments.map((appointment) => {
                                       const appointmentDate = parseISO(appointment.date);
-                                      const isAdditionalService = appointment.isAdditionalService === true;
+                                      const isAdditionalService = appointment.isAdditionalService === true || appointment.isAdditionalServiceBlock === true;
 
                                       return (
                                         <div
@@ -1992,7 +1992,7 @@ export function EnhancedSalonCalendar({
                               const appointmentDate = parseISO(appointment.date);
                               const servicePrice = getServicePrice(appointment.service);
 
-                              const isAdditionalService = appointment.isAdditionalService === true;
+                              const isAdditionalService = appointment.isAdditionalService === true || appointment.isAdditionalServiceBlock === true;
 
                               return (
                                 <div
@@ -2122,7 +2122,7 @@ export function EnhancedSalonCalendar({
                                   <div className="space-y-1 max-h-[150px] overflow-y-auto">
                                     {lateAppointments.map((appointment) => {
                                       const appointmentDate = parseISO(appointment.date);
-                                      const isAdditionalService = appointment.isAdditionalService === true;
+                                      const isAdditionalService = appointment.isAdditionalService === true || appointment.isAdditionalServiceBlock === true;
 
                                       return (
                                         <div

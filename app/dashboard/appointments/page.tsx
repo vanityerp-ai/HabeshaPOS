@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { EnhancedSalonCalendar } from "@/components/scheduling/enhanced-salon-calendar"
 import { EnhancedAppointmentDetailsDialog } from "@/components/scheduling/enhanced-appointment-details-dialog"
 import { useToast } from "@/components/ui/use-toast"
@@ -271,6 +271,20 @@ export default function AppointmentsPage() {
   });
 
   const handleAppointmentClick = (appointment: any) => {
+    // If this is a visual blocking entry (UI-only), find and show the parent appointment instead
+    if (appointment.isVisualBlockingOnly && appointment.parentAppointmentId) {
+      const parentAppointment = appointments.find(apt => apt.id === appointment.parentAppointmentId);
+      if (parentAppointment) {
+        const service = services.find(s => s.name === parentAppointment.service);
+        if (service) {
+          parentAppointment.price = service.price;
+        }
+        setSelectedAppointment(parentAppointment)
+        setIsAppointmentDetailsDialogOpen(true)
+        return;
+      }
+    }
+    
     // If this is a reflected appointment, find and show the original appointment instead
     if (appointment.isReflected && appointment.originalAppointmentId) {
       const originalAppointment = appointments.find(apt => apt.id === appointment.originalAppointmentId);
@@ -675,75 +689,15 @@ export default function AppointmentsPage() {
         justUpdated: updatedAppointment.justUpdated
       });
 
-      // If there are new additional services, create separate appointments for them
-      if (hasNewServices) {
-        const newServices = additionalServices.filter((s: any) =>
-          s.id?.startsWith('service-') || s.id?.startsWith('temp-')
-        );
+      // Note: We no longer create separate database entries for blocking.
+      // Visual blocking entries are now generated client-side in the calendar component
+      // to show staff unavailability, while keeping all services in the parent appointment
+      // for a unified receipt.
 
-        console.log(`📅 [${updateId}] Creating ${newServices.length} separate appointments for additional services`);
-
-        // Find the parent appointment to get client info
-        const parentAppointment = appointments.find(a => a.id === updatedAppointment.id);
-
-        if (parentAppointment) {
-          // Create separate appointment for each new additional service
-          for (const service of newServices) {
-            const additionalServiceAppointment = {
-              id: `add-service-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-              clientId: parentAppointment.clientId,
-              clientName: parentAppointment.clientName,
-              clientEmail: parentAppointment.clientEmail,
-              staffId: service.staffId,
-              staffName: service.staffName,
-              service: service.name,
-              serviceId: service.serviceId,
-              date: service.date || parentAppointment.date,
-              duration: service.duration || 30,
-              location: parentAppointment.location,
-              price: service.price,
-              notes: `Additional service for ${parentAppointment.clientName}`,
-              status: service.status || parentAppointment.status || 'confirmed',
-              type: 'regular',
-              isAdditionalService: true,
-              parentAppointmentId: parentAppointment.id,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-
-            console.log(`📅 [${updateId}] Creating additional service appointment:`, {
-              id: additionalServiceAppointment.id,
-              service: additionalServiceAppointment.service,
-              staff: additionalServiceAppointment.staffName,
-              date: additionalServiceAppointment.date
-            });
-
-            // Create the appointment in the database
-            try {
-              await addAppointmentWithValidation(additionalServiceAppointment);
-              console.log(`✅ [${updateId}] Additional service appointment created successfully`);
-            } catch (error) {
-              console.error(`❌ [${updateId}] Failed to create additional service appointment:`, error);
-              toast({
-                variant: "destructive",
-                title: "Failed to create additional service appointment",
-                description: `Could not create calendar appointment for ${service.name}`,
-              });
-            }
-          }
-
-          // After creating separate appointments, refresh the appointments list
-          setTimeout(() => {
-            loadAppointments();
-          }, 500);
-        }
-      }
-
-      // Only include additionalServices and products if they contain new items
-      // Note: We don't include additionalServices here anymore since they're created as separate appointments
+      // Include additionalServices in the update to keep them in the parent appointment
       const cleanUpdateData = {
         ...updateData,
-        // Don't include additionalServices - they're now separate appointments
+        ...(hasNewServices ? { additionalServices } : {}),
         ...(hasNewProducts ? { products } : {})
       };
 
@@ -798,6 +752,47 @@ export default function AppointmentsPage() {
 
 
 
+  // Generate visual blocking entries for additional services
+  // These are only for calendar display and don't exist in the database
+  const appointmentsWithBlocking = React.useMemo(() => {
+    const result: any[] = [...appointments];
+    
+    // For each appointment with additional services, create visual blocking entries
+    appointments.forEach(appointment => {
+      if (appointment.additionalServices && appointment.additionalServices.length > 0) {
+        appointment.additionalServices.forEach((service: any) => {
+          // Only create blocking if the service has a staff assignment
+          if (service.staffId && service.staffName) {
+            result.push({
+              id: `block-${appointment.id}-${service.serviceId}-${service.staffId}`,
+              originalAppointmentId: appointment.id,
+              clientId: appointment.clientId,
+              clientName: `${appointment.clientName}`, // Show same client name
+              clientEmail: appointment.clientEmail,
+              staffId: service.staffId,
+              staffName: service.staffName,
+              service: service.name,
+              serviceId: service.serviceId,
+              date: service.date || appointment.date,
+              duration: service.duration || 30,
+              location: appointment.location,
+              price: 0, // No price - part of parent appointment
+              notes: appointment.notes,
+              status: appointment.status,
+              type: 'additional-service-block',
+              isVisualBlockingOnly: true, // Flag to indicate this is UI-only
+              parentAppointmentId: appointment.id,
+              createdAt: appointment.createdAt,
+              updatedAt: appointment.updatedAt
+            });
+          }
+        });
+      }
+    });
+    
+    return result;
+  }, [appointments]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-4">
@@ -809,7 +804,7 @@ export default function AppointmentsPage() {
         onDateSelect={setDate}
         onAppointmentClick={handleAppointmentClick}
         selectedDate={date}
-        appointments={appointments}
+        appointments={appointmentsWithBlocking}
         onAppointmentCreated={handleAppointmentCreated}
         onAppointmentUpdated={handleAppointmentUpdated}
       />
