@@ -13,7 +13,7 @@ interface User {
   id: string
   name: string
   email: string
-  role: "ADMIN" | "MANAGER" | "STAFF" | "CLIENT" | "receptionist"
+  role: "ADMIN" | "MANAGER" | "STAFF" | "CLIENT" | "SALES" | "RECEPTIONIST" | "LOCATION_MANAGER"
   locations: string[] // "all" or location IDs like "loc1", "loc2", etc.
 }
 
@@ -256,13 +256,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const permissions = getUserPermissions()
 
     // Priority order for redirection
+    // POS and Inventory are prioritized for Sales role before appointments
     const pageChecks = [
       { path: "/dashboard", permission: PERMISSIONS.VIEW_DASHBOARD },
+      { path: "/dashboard/pos", permission: PERMISSIONS.VIEW_POS },
+      { path: "/dashboard/inventory", permission: PERMISSIONS.VIEW_INVENTORY },
       { path: "/dashboard/appointments", permissions: [PERMISSIONS.VIEW_APPOINTMENTS, PERMISSIONS.VIEW_OWN_APPOINTMENTS] },
       { path: "/dashboard/clients", permission: PERMISSIONS.VIEW_CLIENTS },
       { path: "/dashboard/services", permission: PERMISSIONS.VIEW_SERVICES },
-      { path: "/dashboard/pos", permission: PERMISSIONS.VIEW_POS },
-      { path: "/dashboard/inventory", permission: PERMISSIONS.VIEW_INVENTORY },
       { path: "/dashboard/staff", permission: PERMISSIONS.VIEW_STAFF },
       { path: "/dashboard/accounting", permission: PERMISSIONS.VIEW_ACCOUNTING },
       { path: "/dashboard/hr", permission: PERMISSIONS.VIEW_HR },

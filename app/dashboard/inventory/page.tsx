@@ -732,18 +732,26 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
-                                  <Package className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
-                                  Adjust
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleTransferProduct(product)} title="Transfer stock">
-                                  <ArrowRightLeft className="h-4 w-4" />
-                                </Button>
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
+                                    <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
+                                    Adjust
+                                  </Button>
+                                )}
+                                {(hasPermission("transfer_inventory") || hasPermission("edit_inventory")) && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleTransferProduct(product)} title="Transfer stock">
+                                    <ArrowRightLeft className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -931,15 +939,21 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
-                                  <Package className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
-                                  Stock
-                                </Button>
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
+                                    <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
+                                    Stock
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1168,38 +1182,46 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex gap-1 justify-end">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditProduct(product)}
-                                  title="Edit product details"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleMultiLocationStockEdit(product)}
-                                  title="Edit stock for all locations"
-                                >
-                                  <Package className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleAdjustStock(product)}
-                                  title="Adjust stock levels"
-                                >
-                                  Adjust
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleTransferProduct(product)}
-                                  title="Transfer between locations"
-                                >
-                                  <ArrowRightLeft className="h-4 w-4" />
-                                </Button>
+                                {hasPermission("edit_inventory") && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditProduct(product)}
+                                    title="Edit product details"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMultiLocationStockEdit(product)}
+                                    title="Edit stock for all locations"
+                                  >
+                                    <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAdjustStock(product)}
+                                    title="Adjust stock levels"
+                                  >
+                                    Adjust
+                                  </Button>
+                                )}
+                                {(hasPermission("transfer_inventory") || hasPermission("edit_inventory")) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleTransferProduct(product)}
+                                    title="Transfer between locations"
+                                  >
+                                    <ArrowRightLeft className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1319,18 +1341,26 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
-                                  <Package className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
-                                  Adjust
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleTransferProduct(product)} title="Transfer stock">
-                                  <ArrowRightLeft className="h-4 w-4" />
-                                </Button>
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} title="Edit product">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleMultiLocationStockEdit(product)} title="Edit stock for all locations">
+                                    <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("edit_inventory") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleAdjustStock(product)} title="Adjust stock (single location)">
+                                    Adjust
+                                  </Button>
+                                )}
+                                {(hasPermission("transfer_inventory") || hasPermission("edit_inventory")) && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleTransferProduct(product)} title="Transfer stock">
+                                    <ArrowRightLeft className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1362,7 +1392,7 @@ export default function InventoryPage() {
                       <Download className="mr-2 h-4 w-4" />
                       Export
                     </Button>
-                    {hasPermission("create_inventory") && (
+                    {(hasPermission("transfer_inventory") || hasPermission("edit_inventory")) && (
                       <Button
                         size="sm"
                         onClick={() => setIsProductTransferDialogOpen(true)}
