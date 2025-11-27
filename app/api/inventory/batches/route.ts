@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getServerSession } from "next-auth/next"
+import { getServerSession } from "next-auth"
 
 // GET /api/inventory/batches - Get all product batches with optional filtering
 export async function GET(request: Request) {
