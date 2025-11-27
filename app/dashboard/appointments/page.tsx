@@ -778,12 +778,13 @@ export default function AppointmentsPage() {
               location: appointment.location,
               price: 0, // No price - part of parent appointment
               notes: appointment.notes,
-              status: appointment.status,
+              status: service.completed ? 'completed' : appointment.status, // Use service's completed status
               type: 'additional-service-block',
               isVisualBlockingOnly: true, // Flag to indicate this is UI-only
               parentAppointmentId: appointment.id,
               createdAt: appointment.createdAt,
-              updatedAt: appointment.updatedAt
+              updatedAt: appointment.updatedAt,
+              isAdditionalService: true // Flag for calendar display
             });
           }
         });

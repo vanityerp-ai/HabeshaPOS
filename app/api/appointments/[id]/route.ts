@@ -114,7 +114,8 @@ export async function GET(
           price: Number(s.price),
           duration: s.duration,
           staffId: s.staffId,
-          staffName: s.staff?.name || null
+          staffName: s.staff?.name || null,
+          completed: s.completed
         };
       }),
       products: appointment.products.map(p => ({
@@ -290,6 +291,16 @@ export async function PUT(
     // Add statusHistory if provided (store as JSON string)
     if (data.statusHistory !== undefined) {
       updateData.statusHistory = JSON.stringify(data.statusHistory);
+    }
+
+    // If the appointment status is being changed to 'completed',
+    // also mark all associated services as completed
+    if (data.status === 'completed') {
+      console.log('✅ Parent appointment marked as completed - updating all services to completed');
+      await prisma.appointmentService.updateMany({
+        where: { appointmentId: id },
+        data: { completed: true }
+      });
     }
 
     // Add additional services if there are new ones to add
@@ -507,7 +518,8 @@ export async function PUT(
           price: Number(s.price),
           duration: s.duration,
           staffId: s.staffId,
-          staffName: s.staff?.name || null
+          staffName: s.staff?.name || null,
+          completed: s.completed
         };
       }),
       products: updatedAppointment.products.map(p => ({
