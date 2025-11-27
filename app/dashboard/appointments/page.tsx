@@ -566,7 +566,7 @@ export default function AppointmentsPage() {
     }
   }
 
-  const handleAppointmentUpdated = (updatedAppointmentData: any) => {
+  const handleAppointmentUpdated = async (updatedAppointmentData: any) => {
     // Check if we're receiving a full array of appointments or just a single update
     if (Array.isArray(updatedAppointmentData)) {
       console.log("AppointmentsPage: Received full appointments array update", updatedAppointmentData.length);

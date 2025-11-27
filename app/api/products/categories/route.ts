@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getServerSession } from "next-auth"
+import { getServerSession } from "next-auth/next"
 
 // GET /api/products/categories - Fetch all product categories from database
 export async function GET() {
