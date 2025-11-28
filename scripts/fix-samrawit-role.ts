@@ -1,9 +1,11 @@
-import { prisma } from '../lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 async function main() {
   console.log('🔍 Finding Samrawit in database...\n')
 
-  // Find Samrawit
+  // Find Samrawit in Staff table
   const samrawit = await prisma.staff.findFirst({
     where: {
       OR: [
@@ -79,6 +81,7 @@ main()
     console.error('Error:', e)
     process.exit(1)
   })
-  .then(() => {
+  .finally(async () => {
+    await prisma.$disconnect()
     process.exit(0)
   })

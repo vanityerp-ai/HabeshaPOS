@@ -230,6 +230,7 @@ export const ROLE_PERMISSIONS = {
   // Staff has very limited permissions (NO dashboard access - only Admins)
   STAFF: [
     // REMOVED: PERMISSIONS.VIEW_DASHBOARD - Only Admins and Super Admins can access dashboard
+    PERMISSIONS.VIEW_APPOINTMENTS,
     PERMISSIONS.VIEW_OWN_APPOINTMENTS, PERMISSIONS.EDIT_OWN_APPOINTMENTS,
     // REMOVED: PERMISSIONS.VIEW_OWN_CLIENTS - Only Admins and Super Admins can access client management
     PERMISSIONS.VIEW_SERVICES,
@@ -238,12 +239,9 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_CHAT, PERMISSIONS.SEND_MESSAGES, PERMISSIONS.SEND_PRODUCT_REQUESTS, PERMISSIONS.SEND_HELP_REQUESTS,
   ],
 
-  // Sales role has POS and inventory management permissions
+  // Sales role - RESTRICTED to POS and Inventory ONLY
+  // NO access to appointments, clients, services, staff, or other modules
   SALES: [
-    PERMISSIONS.VIEW_APPOINTMENTS, PERMISSIONS.CREATE_APPOINTMENT,
-    PERMISSIONS.CREATE_CLIENT, PERMISSIONS.EDIT_CLIENT,
-    PERMISSIONS.VIEW_SERVICES,
-    PERMISSIONS.VIEW_STAFF,
     // Inventory access - view, create, and transfer only (no edit)
     PERMISSIONS.VIEW_INVENTORY,
     PERMISSIONS.CREATE_INVENTORY,
@@ -254,17 +252,13 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.EDIT_SALE,
     PERMISSIONS.APPLY_DISCOUNT,
     PERMISSIONS.ISSUE_REFUND,
-    // Gift Card & Membership permissions for sales
+    // Gift Card permissions (needed for POS operations)
     PERMISSIONS.VIEW_GIFT_CARDS,
     PERMISSIONS.CREATE_GIFT_CARD,
     PERMISSIONS.REDEEM_GIFT_CARD,
+    // Membership permissions (needed for POS operations)
     PERMISSIONS.VIEW_MEMBERSHIPS,
     PERMISSIONS.CREATE_MEMBERSHIP,
-    // Chat permissions
-    PERMISSIONS.VIEW_CHAT,
-    PERMISSIONS.SEND_MESSAGES,
-    PERMISSIONS.SEND_PRODUCT_REQUESTS,
-    PERMISSIONS.SEND_HELP_REQUESTS,
   ],
 };
 

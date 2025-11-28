@@ -1,7 +1,7 @@
 # SALES Role Permissions
 
 ## Overview
-The SALES role is designed for staff members who primarily handle Point of Sale (POS) transactions and inventory management. This role has comprehensive access to sales and inventory functions while maintaining appropriate restrictions on sensitive areas.
+The SALES role is **STRICTLY LIMITED** to Point of Sale (POS) transactions and inventory management **ONLY**. This role has NO access to appointments, clients, services, staff management, or any other modules. It is designed for dedicated cashier/inventory staff who should focus solely on sales and stock management.
 
 ## Granted Permissions
 
@@ -19,19 +19,6 @@ The SALES role is designed for staff members who primarily handle Point of Sale 
 
 ❌ **Note:** Sales role CANNOT edit existing inventory items. Only Admin and Super Admin can edit inventory.
 
-### ✅ Appointments (Limited)
-- **`VIEW_APPOINTMENTS`** - View appointment calendar
-- **`CREATE_APPOINTMENT`** - Book new appointments for customers
-
-### ✅ Client Management (Limited)
-- **`CREATE_CLIENT`** - Add new clients to the system
-- **`EDIT_CLIENT`** - Update client information
-
-### ✅ Service Information
-- **`VIEW_SERVICES`** - View available services and pricing
-
-### ✅ Staff Information
-- **`VIEW_STAFF`** - View staff members and their schedules
 
 ### ✅ Gift Cards & Memberships
 - **`VIEW_GIFT_CARDS`** - View gift card inventory
@@ -40,26 +27,24 @@ The SALES role is designed for staff members who primarily handle Point of Sale 
 - **`VIEW_MEMBERSHIPS`** - View membership information
 - **`CREATE_MEMBERSHIP`** - Sell membership packages
 
-### ✅ Communication
-- **`VIEW_CHAT`** - Access team chat
-- **`SEND_MESSAGES`** - Send messages to team members
-- **`SEND_PRODUCT_REQUESTS`** - Request products from management
-- **`SEND_HELP_REQUESTS`** - Request assistance
 
 ## ❌ Restricted Access
 
 The SALES role does NOT have access to:
-- Dashboard analytics
-- Delete operations (appointments, clients, inventory)
-- **Edit inventory items** (only Admin and Super Admin)
-- **Adjust stock levels** (only Admin and Super Admin)
-- Staff management (create, edit, delete staff)
-- Service management (create, edit, delete services)
-- Accounting & financial reports
-- HR management
-- System settings
-- Location management
-- Full client history viewing (only Admins)
+- **Dashboard** - No access to analytics or overview
+- **Appointments** - Cannot view, create, or manage appointments
+- **Clients** - Cannot access client management (no view, create, edit)
+- **Services** - Cannot view or manage services
+- **Staff** - Cannot view or manage staff members
+- **Delete operations** - No delete permissions for any entity
+- **Edit inventory items** - Only Admin and Super Admin can edit products
+- **Adjust stock levels** - Only Admin and Super Admin
+- **Accounting** - No access to financial reports or accounting
+- **HR Management** - No access to HR module
+- **Reports** - No access to reporting
+- **Settings** - No access to system settings
+- **Location management** - Cannot manage locations
+- **Chat/Communication** - No access to team chat
 
 ## Typical Use Cases
 
@@ -82,14 +67,6 @@ The SALES role does NOT have access to:
 Note: Cannot edit existing product details or adjust stock - Admin only
 ```
 
-### 3. Booking Appointments
-```
-1. Navigate to Appointments
-2. Create new appointment
-3. Select service and staff
-4. Add or edit client information
-5. Confirm booking
-```
 
 ### 4. Handling Returns/Refunds
 ```
