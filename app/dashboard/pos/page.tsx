@@ -223,6 +223,31 @@ export default function POSPage() {
   }
 
   const addToCart = (item: any, type: "service" | "product") => {
+    // Check stock for products
+    if (type === "product") {
+      if (item.stock <= 0) {
+        toast({
+          variant: "destructive",
+          title: "Out of stock",
+          description: `${item.name} is currently out of stock.`,
+        })
+        return
+      }
+
+      // Check if adding would exceed available stock
+      const existingItem = cartItems.find((cartItem) => cartItem.id === item.id && cartItem.type === type)
+      const currentQuantity = existingItem ? existingItem.quantity : 0
+      
+      if (currentQuantity >= item.stock) {
+        toast({
+          variant: "destructive",
+          title: "Maximum quantity reached",
+          description: `You already have all available units (${item.stock}) of ${item.name} in your cart.`,
+        })
+        return
+      }
+    }
+
     const existingItemIndex = cartItems.findIndex((cartItem) => cartItem.id === item.id && cartItem.type === type)
 
     if (existingItemIndex >= 0) {
@@ -742,22 +767,32 @@ export default function POSPage() {
                       {filteredItems.map((product) => (
                         <Card key={product.id} className="overflow-hidden">
                           <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-base">{product.name}</CardTitle>
+                            <div className="flex justify-between items-start mb-2">
+                              <CardTitle className="text-base">{product.name}</CardTitle>
+                              {product.type === 'product' && (
+                                <Badge
+                                  variant={(product as any).stock === 0 ? "destructive" : (product as any).stock < 5 ? "secondary" : "outline"}
+                                  className="text-xs font-semibold"
+                                >
+                                  {(product as any).stock === 0 ? "Out" : (product as any).stock < 5 ? `Low: ${(product as any).stock}` : `${(product as any).stock} units`}
+                                </Badge>
+                              )}
+                            </div>
                             <CardDescription>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full mr-2">
+                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
                                 {product.category}
                               </span>
-                              {product.type === 'product' && `In stock: ${(product as any).stock}`}
                             </CardDescription>
                           </CardHeader>
-                          <CardFooter className="p-4 pt-2 flex justify-between">
+                          <CardFooter className="p-4 pt-2 flex justify-between items-center">
                             <p className="font-medium"><CurrencyDisplay amount={product.price} /></p>
                             <Button
                               size="sm"
                               onClick={() => addToCart(product, "product")}
                               disabled={product.type === 'product' && (product as any).stock <= 0}
                             >
-                              <Plus className="h-4 w-4 mr-1" /> Add
+                              <Plus className="h-4 w-4 mr-1" />
+                              {product.type === 'product' && (product as any).stock <= 0 ? "Out of Stock" : "Add"}
                             </Button>
                           </CardFooter>
                         </Card>

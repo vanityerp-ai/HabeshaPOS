@@ -285,6 +285,8 @@ export default function CheckoutPage() {
 
       // Pre-check inventory availability for all items before processing
       console.log('🔍 Pre-checking inventory availability...')
+      const stockIssues: string[] = [];
+      
       for (const item of validCartItems) {
         try {
           const inventoryCheckResponse = await fetch(`/api/inventory?locationId=${onlineLocationId}`)
@@ -306,8 +308,16 @@ export default function CheckoutPage() {
             
             const productInventory = validInventory.find((inv: any) => inv.id === item.product.id)
 
-            if (!productInventory || productInventory.stock < item.quantity) {
-              throw new Error(`Insufficient stock for ${item.product.name}. Available: ${productInventory?.stock || 0}, Requested: ${item.quantity}`)
+            // Check for zero stock
+            if (!productInventory || productInventory.stock === 0) {
+              stockIssues.push(`${item.product.name} is out of stock`);
+              throw new Error(`${item.product.name} is out of stock. Please remove it from your cart.`)
+            }
+            
+            // Check for insufficient stock
+            if (productInventory.stock < item.quantity) {
+              stockIssues.push(`${item.product.name}: Only ${productInventory.stock} available, but ${item.quantity} requested`);
+              throw new Error(`Insufficient stock for ${item.product.name}. Available: ${productInventory.stock}, Requested: ${item.quantity}. Please reduce the quantity.`)
             }
             
             console.log(`✅ Stock confirmed for ${item.product.name}: ${productInventory.stock} available, ${item.quantity} requested`)
@@ -317,6 +327,11 @@ export default function CheckoutPage() {
           throw error
         }
       }
+      
+      if (stockIssues.length > 0) {
+        throw new Error(`Cannot complete checkout: ${stockIssues.join('; ')}`)
+      }
+      
       console.log('✅ Inventory availability confirmed for all items')
 
       // Create order data

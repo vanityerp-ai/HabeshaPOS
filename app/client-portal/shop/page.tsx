@@ -233,7 +233,7 @@ export default function ShopPage() {
     setSelectedProduct(null)
   }, [])
 
-  const handleAddToCart = useCallback((product: Product) => {
+  const handleAddToCart = useCallback(async (product: Product) => {
     // Check if we have enough stock
     if (product.stock <= 0) {
       toast({
@@ -242,6 +242,42 @@ export default function ShopPage() {
         variant: "destructive"
       });
       return;
+    }
+
+    // Verify real-time stock from database before adding to cart
+    try {
+      const response = await fetch('/api/client-portal/products');
+      if (response.ok) {
+        const data = await response.json();
+        const currentProduct = data.products?.find((p: Product) => p.id === product.id);
+        
+        if (!currentProduct || currentProduct.stock <= 0) {
+          toast({
+            title: "Out of stock",
+            description: `Sorry, ${product.name} is no longer available.`,
+            variant: "destructive"
+          });
+          // Refresh products to show current stock
+          await fetchProducts();
+          return;
+        }
+
+        // Check if we're trying to add more than available
+        const currentCartItem = getCartItem(product.id);
+        const cartQuantity = currentCartItem?.quantity || 0;
+        
+        if (cartQuantity >= currentProduct.stock) {
+          toast({
+            title: "Maximum quantity reached",
+            description: `You already have all available units (${currentProduct.stock}) of ${product.name} in your cart.`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error checking stock:', error);
+      // Continue with add to cart even if check fails
     }
 
     // Ensure product has required properties for cart
@@ -254,7 +290,12 @@ export default function ShopPage() {
 
     // Add to cart using cart provider
     addToCart(cartProduct, 1);
-  }, [toast, addToCart])
+    
+    toast({
+      title: "Added to cart",
+      description: `${product.name} has been added to your cart.`,
+    });
+  }, [toast, addToCart, fetchProducts, getCartItem])
 
   const handleAddToWishlist = useCallback((product: Product) => {
     // Ensure product has required properties for wishlist
