@@ -16,7 +16,7 @@ export interface ChatChannel {
   id: string;
   name: string;
   description?: string;
-  type: 'general' | 'help_desk' | 'product_requests' | 'location_specific' | 'private';
+  type: 'general' | 'help_desk' | 'product_requests' | 'location_specific' | 'private' | 'direct_message';
   locationId?: string;
   isPrivate: boolean;
   memberCount: number;
@@ -25,6 +25,8 @@ export interface ChatChannel {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  // For DM channels
+  participants?: string[]; // User IDs
 }
 
 export interface ChatMessage {
@@ -269,11 +271,68 @@ export class ChatService {
    * Get all channels accessible to current user
    */
   getChannels(): ChatChannel[] {
+    if (!this.currentUser) return [];
+    
     return this.channels.filter(channel => {
-      // For now, return all non-private channels
-      // In a real implementation, check user permissions and location access
+      // Return public channels or DM channels where user is a participant
+      if (channel.type === 'direct_message') {
+        return channel.participants?.includes(this.currentUser!.id);
+      }
       return !channel.isPrivate;
     });
+  }
+
+  /**
+   * Get all users (for user list)
+   */
+  getUsers(): ChatUser[] {
+    return this.users.filter(u => u.id !== this.currentUser?.id);
+  }
+
+  /**
+   * Get or create a DM channel between current user and another user
+   */
+  getOrCreateDMChannel(otherUserId: string): ChatChannel {
+    if (!this.currentUser) {
+      throw new Error('No current user set');
+    }
+
+    // Find existing DM channel between these users
+    const existingDM = this.channels.find(channel => 
+      channel.type === 'direct_message' &&
+      channel.participants &&
+      channel.participants.includes(this.currentUser!.id) &&
+      channel.participants.includes(otherUserId)
+    );
+
+    if (existingDM) {
+      return existingDM;
+    }
+
+    // Create new DM channel
+    const otherUser = this.users.find(u => u.id === otherUserId);
+    if (!otherUser) {
+      throw new Error('User not found');
+    }
+
+    const dmChannel: ChatChannel = {
+      id: `dm-${this.currentUser.id}-${otherUserId}`,
+      name: otherUser.name,
+      type: 'direct_message',
+      isPrivate: true,
+      memberCount: 2,
+      unreadCount: 0,
+      createdBy: this.currentUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      participants: [this.currentUser.id, otherUserId]
+    };
+
+    this.channels.push(dmChannel);
+    this.saveToStorage();
+    this.notifyChannelListeners();
+
+    return dmChannel;
   }
 
   /**
@@ -338,26 +397,47 @@ export class ChatService {
    * Create notifications for a message
    */
   private createNotifications(message: ChatMessage) {
-    // For now, create notifications for all users except sender
-    // In a real implementation, this would be more sophisticated
-    this.users
-      .filter(user => user.id !== message.senderId)
-      .forEach(user => {
+    const channel = this.channels.find(c => c.id === message.channelId);
+    
+    // For DM channels, notify only the other participant
+    if (channel && channel.type === 'direct_message' && channel.participants) {
+      const otherUserId = channel.participants.find(id => id !== message.senderId);
+      if (otherUserId) {
         const notification: ChatNotification = {
           id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          userId: user.id,
+          userId: otherUserId,
           messageId: message.id,
           channelId: message.channelId,
-          channelName: this.channels.find(c => c.id === message.channelId)?.name || 'Unknown',
+          channelName: message.senderName,
           senderName: message.senderName,
-          type: 'channel_message',
+          type: 'direct_message',
           content: message.content,
           isRead: false,
           createdAt: new Date()
         };
-
         this.notifications.push(notification);
-      });
+      }
+    } else {
+      // For regular channels, notify all users except sender
+      this.users
+        .filter(user => user.id !== message.senderId)
+        .forEach(user => {
+          const notification: ChatNotification = {
+            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            userId: user.id,
+            messageId: message.id,
+            channelId: message.channelId,
+            channelName: channel?.name || 'Unknown',
+            senderName: message.senderName,
+            type: 'channel_message',
+            content: message.content,
+            isRead: false,
+            createdAt: new Date()
+          };
+
+          this.notifications.push(notification);
+        });
+    }
 
     this.saveToStorage();
     this.notifyNotificationListeners();

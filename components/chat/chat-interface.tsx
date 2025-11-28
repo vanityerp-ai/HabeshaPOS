@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { chatService, type ChatChannel, type ChatMessage, type ChatNotification } from "@/lib/chat-service"
 import { ProductRequestDialog } from "./product-request-dialog"
 import { HelpRequestDialog } from "./help-request-dialog"
+import { UserList } from "./user-list"
 import {
   MessageCircle,
   Send,
@@ -42,6 +43,8 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
   const [notifications, setNotifications] = useState<ChatNotification[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeView, setActiveView] = useState<'channels' | 'users'>('channels')
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Initialize chat service with current user
@@ -114,12 +117,21 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     }
   }
 
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId)
+    const dmChannel = chatService.getOrCreateDMChannel(userId)
+    setActiveChannelId(dmChannel.id)
+    setActiveView('channels')
+  }
+
   const getChannelIcon = (channel: ChatChannel) => {
     switch (channel.type) {
       case 'product_requests':
         return <Package className="h-4 w-4" />
       case 'help_desk':
         return <HelpCircle className="h-4 w-4" />
+      case 'direct_message':
+        return <MessageCircle className="h-4 w-4" />
       default:
         return <Hash className="h-4 w-4" />
     }
@@ -168,7 +180,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
   return (
     <Card className={cn(
       "fixed bottom-4 right-4 z-50 shadow-xl border-2",
-      isMinimized ? "w-80 h-16" : "w-96 h-[600px]",
+      isMinimized ? "w-80 h-16" : "w-[800px] h-[600px]",
       className
     )}>
       <CardHeader className="pb-2 px-4 py-3 flex flex-row items-center justify-between space-y-0">
@@ -182,6 +194,24 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
           )}
         </CardTitle>
         <div className="flex items-center gap-1">
+          <Button
+            variant={activeView === 'channels' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setActiveView('channels')}
+          >
+            <Hash className="h-3 w-3 mr-1" />
+            Channels
+          </Button>
+          <Button
+            variant={activeView === 'users' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setActiveView('users')}
+          >
+            <Users className="h-3 w-3 mr-1" />
+            Team
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -203,26 +233,33 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
 
       {!isMinimized && (
         <CardContent className="p-0 h-[calc(100%-4rem)] flex flex-col">
-          <Tabs value={activeChannelId} onValueChange={setActiveChannelId} className="flex-1 flex flex-col">
-            <div className="px-4 pb-2">
-              <TabsList className="grid w-full grid-cols-3 h-8">
-                {channels.slice(0, 3).map((channel) => (
-                  <TabsTrigger
-                    key={channel.id}
-                    value={channel.id}
-                    className="text-xs px-2 flex items-center gap-1"
-                  >
-                    {getChannelIcon(channel)}
-                    <span className="truncate">{channel.name}</span>
-                    {channel.unreadCount > 0 && (
-                      <Badge variant="destructive" className="h-4 w-4 p-0 text-xs">
-                        {channel.unreadCount}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          {activeView === 'users' ? (
+            <div className="flex-1 p-4">
+              <UserList onSelectUser={handleUserSelect} selectedUserId={selectedUserId} />
             </div>
+          ) : (
+            <Tabs value={activeChannelId} onValueChange={setActiveChannelId} className="flex-1 flex flex-col">
+              <div className="px-4 pb-2">
+                <ScrollArea className="w-full">
+                  <TabsList className="w-full h-8 inline-flex">
+                    {channels.map((channel) => (
+                      <TabsTrigger
+                        key={channel.id}
+                        value={channel.id}
+                        className="text-xs px-3 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        {getChannelIcon(channel)}
+                        <span className="truncate">{channel.name}</span>
+                        {channel.unreadCount > 0 && (
+                          <Badge variant="destructive" className="h-4 w-4 p-0 text-xs">
+                            {channel.unreadCount}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </ScrollArea>
+              </div>
 
             {channels.map((channel) => (
               <TabsContent
@@ -348,6 +385,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
               </TabsContent>
             ))}
           </Tabs>
+          )}
         </CardContent>
       )}
     </Card>
