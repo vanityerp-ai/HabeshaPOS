@@ -19,6 +19,7 @@ function mapStaffRoleToUserRole(staffRole: string): string {
     'nail_technician': 'STAFF',
     'esthetician': 'STAFF',
     'receptionist': 'STAFF',
+    'sales': 'SALES',
     'staff': 'STAFF',
 
     // Client role
@@ -26,6 +27,9 @@ function mapStaffRoleToUserRole(staffRole: string): string {
   };
 
   const normalizedRole = staffRole.toLowerCase().trim();
+  if (normalizedRole.includes("sales")) {
+    return 'SALES';
+  }
   return roleMapping[normalizedRole] || 'STAFF'; // Default to STAFF if role not found
 }
 

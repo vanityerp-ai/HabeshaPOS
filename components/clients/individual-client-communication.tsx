@@ -30,7 +30,7 @@ interface Client {
   name: string
   email: string
   phone: string
-  segment: string
+  segment?: string
   status: string
 }
 

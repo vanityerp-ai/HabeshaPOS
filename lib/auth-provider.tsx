@@ -254,6 +254,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return "/login"
 
     const permissions = getUserPermissions()
+    const roleUpper = user.role.toUpperCase()
+
+    // Special handling for SALES role - always redirect to POS
+    if (roleUpper === "SALES") {
+      console.log("🔐 SALES role detected - redirecting to POS")
+      return "/dashboard/pos"
+    }
 
     // Priority order for redirection
     // POS and Inventory are prioritized for Sales role before appointments
@@ -272,12 +279,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]
 
     for (const check of pageChecks) {
-      if ('permissions' in check) {
+      if ('permissions' in check && check.permissions) {
         // Check if user has any of the permissions
         if (check.permissions.some(p => permissions.includes(p) || permissions.includes(PERMISSIONS.ALL))) {
           return check.path
         }
-      } else if ('permission' in check) {
+      } else if ('permission' in check && check.permission) {
         // Check if user has the specific permission
         if (permissions.includes(check.permission) || permissions.includes(PERMISSIONS.ALL)) {
           return check.path

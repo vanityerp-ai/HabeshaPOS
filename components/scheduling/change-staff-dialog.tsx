@@ -22,6 +22,7 @@ import { useApiStaff } from "@/lib/api-staff-service"
 import { useServices } from "@/lib/service-provider"
 import { Appointment } from "@/lib/types/appointment"
 import { updateAppointment } from "@/lib/appointment-service"
+import { getFirstName } from "@/lib/female-avatars"
 
 interface ChangeStaffDialogProps {
   open: boolean
@@ -55,7 +56,8 @@ export function ChangeStaffDialog({
   const appointmentService = useMemo(() => {
     return services.find(service => 
       service.name === appointment.service || 
-      service.id === appointment.serviceId
+      // @ts-ignore - serviceId property exists in actual appointment objects
+      service.id === (appointment as any).serviceId
     )
   }, [services, appointment])
 
@@ -162,6 +164,7 @@ export function ChangeStaffDialog({
       const updatedAppointment = await updateAppointment(appointment.id, updates)
 
       if (updatedAppointment && onAppointmentUpdated) {
+        // @ts-ignore
         onAppointmentUpdated(updatedAppointment)
       }
 
@@ -223,7 +226,7 @@ export function ChangeStaffDialog({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="font-medium">{currentStaff?.name || appointment.staffName}</div>
+                <div className="font-medium">{getFirstName(currentStaff?.name || appointment.staffName)}</div>
                 <div className="text-sm text-muted-foreground">
                   {currentStaff?.role || 'Staff Member'}
                 </div>
@@ -267,7 +270,7 @@ export function ChangeStaffDialog({
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{staff.name}</span>
+                            <span className="font-medium">{getFirstName(staff.name)}</span>
                             {isCurrent && <Badge variant="secondary" className="text-xs">Current</Badge>}
                             {conflict && <Badge variant="destructive" className="text-xs">Conflict</Badge>}
                           </div>
@@ -293,7 +296,7 @@ export function ChangeStaffDialog({
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="font-medium">{newStaff.name}</div>
+                  <div className="font-medium">{getFirstName(newStaff.name)}</div>
                   <div className="text-sm text-muted-foreground">
                     {newStaff.role}
                   </div>

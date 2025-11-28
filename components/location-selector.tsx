@@ -10,6 +10,8 @@ export function LocationSelector() {
   const { currentLocation, setCurrentLocation, user, isAuthenticated } = useAuth()
   const { locations, getLocationName, isHomeServiceEnabled, getActiveLocations, isLoading, hasInitialized } = useLocations()
   const { filterLocations, isAdmin, userLocations } = useLocationFilter()
+  const roleUpper = user?.role?.toUpperCase() || ""
+  const isSalesRole = roleUpper === "SALES"
 
   // Memoize the filtered locations to prevent unnecessary re-renders
   const filteredLocations = React.useMemo(() => {
@@ -32,8 +34,29 @@ export function LocationSelector() {
     // Apply location filtering based on user access
     const userFilteredLocations = filterLocations(uniqueActiveLocations);
 
+    if (isSalesRole) {
+      const onlineLocation = userFilteredLocations.find(loc => loc.id === "online") || {
+        id: "online",
+        name: "Online Store",
+        address: "Client Portal",
+        city: "Online",
+        state: "Online",
+        zipCode: "",
+        country: "Online",
+        phone: "",
+        email: "support@salonhub.com",
+        status: "Active",
+        description: "Online orders placed through the client portal",
+        enableOnlineBooking: false,
+        displayOnWebsite: false,
+        staffCount: 0,
+        servicesCount: 0,
+      }
+      return [onlineLocation]
+    }
+
     return userFilteredLocations;
-  }, [getActiveLocations, filterLocations]);
+  }, [getActiveLocations, filterLocations, isSalesRole]);
 
   const handleLocationChange = React.useCallback((newLocation: string) => {
     setCurrentLocation(newLocation)
@@ -108,16 +131,18 @@ export function LocationSelector() {
       ...(onlineLocation ? ["online"] : [])
     ];
 
-    const selectValue = currentLocation && allAvailableIds.includes(currentLocation)
-      ? currentLocation
-      : (isAdmin ? "all" : allAvailableIds[0] || "");
+    const selectValue = isSalesRole
+      ? "online"
+      : currentLocation && allAvailableIds.includes(currentLocation)
+        ? currentLocation
+        : (isAdmin ? "all" : allAvailableIds[0] || "");
 
     return (
       <Select
         value={selectValue}
         onValueChange={handleLocationChange}
       >
-        <SelectTrigger className="w-[180px] bg-muted/50 border-0">
+        <SelectTrigger className="w-[180px] bg-muted/50 border-0" disabled={isSalesRole}>
           <SelectValue placeholder="Select location" />
         </SelectTrigger>
         <SelectContent>

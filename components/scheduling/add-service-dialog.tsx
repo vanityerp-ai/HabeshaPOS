@@ -13,6 +13,7 @@ import { AlertCircle } from "lucide-react"
 import { parseISO, addMinutes, isWithinInterval } from "date-fns"
 import { CurrencyDisplay } from "@/components/ui/currency-display"
 import { useCurrency } from "@/lib/currency-provider"
+import { getFirstName } from "@/lib/female-avatars"
 
 interface AddServiceDialogProps {
   open: boolean
@@ -61,7 +62,8 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
         setCurrentBooking(propCurrentBooking)
       } else {
         // Fallback to mock data if no booking is passed
-        const booking = mockAppointments.find(a => a.id === bookingId)
+        // Use the propCurrentBooking if available
+        const booking = propCurrentBooking
         if (booking) {
           setCurrentBooking(booking)
         }
@@ -178,7 +180,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
       console.log("Available services:", services.length, "total");
 
       // Log services by category
-      const servicesByCategory = {};
+      const servicesByCategory: Record<string, string[]> = {};
       services.forEach(service => {
         if (!servicesByCategory[service.category]) {
           servicesByCategory[service.category] = [];
@@ -295,6 +297,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
         price: serviceDetails.price,
         duration: serviceDetails.duration,
         staffId: staffDetails.id,
+        staff: staffDetails.name, // Use staff to match UI expectations
         staffName: staffDetails.name, // Use staffName to match API expectations
       }
 
@@ -314,7 +317,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
 
       toast({
         title: "Service added",
-        description: `${serviceDetails.name} with ${staffDetails.name} has been added to the booking.`,
+        description: `${serviceDetails.name} with ${getFirstName(staffDetails.name)} has been added to the booking.`,
       })
 
       // Reset form and close dialog
@@ -435,7 +438,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
                         className={isUnavailable ? "text-red-500 line-through" : ""}
                         disabled={isUnavailable}
                       >
-                        {staff.name} - {(staff.role || staff.jobRole || "Staff").replace("_", " ")}
+                        {getFirstName(staff.name)} - {(staff.role || "Staff").replace("_", " ")}
                         {isUnavailable ? " (Unavailable)" : ""}
                       </SelectItem>
                     );
@@ -449,7 +452,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
             </Select>
             {selectedStaff && (
               <div className="text-xs text-gray-500 mt-1">
-                Selected staff: {realStaff.find(s => s.id === selectedStaff)?.name || "Unknown"}
+                Selected staff: {getFirstName(realStaff.find(s => s.id === selectedStaff)?.name || "Unknown")}
               </div>
             )}
             {staffWarning && (

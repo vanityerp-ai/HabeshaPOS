@@ -181,30 +181,30 @@ export default function ReportsPage() {
             break
           case 'sales':
             const salesData = aggregateSalesData(filteredTransactions, options.dateRange, 'day', options.location)
-            reportSections.push(prepareTableDataForExport(salesData, 'Sales Data'))
+            reportSections.push(prepareTableDataForExport(salesData, 'Sales Data', undefined))
             break
           case 'appointments':
             const appointmentData = aggregateAppointmentData(filteredTransactions, options.dateRange, options.location)
-            reportSections.push(prepareTableDataForExport(appointmentData, 'Appointments'))
+            reportSections.push(prepareTableDataForExport(appointmentData, 'Appointments', undefined))
             break
           case 'staff':
             const staffData = aggregateStaffPerformanceData(filteredTransactions, staff || [], options.dateRange, options.location)
-            reportSections.push(prepareTableDataForExport(staffData, 'Staff Performance'))
+            reportSections.push(prepareTableDataForExport(staffData, 'Staff Performance', undefined))
             break
           case 'services':
             const serviceData = aggregateServicePopularityData(filteredTransactions, options.dateRange, options.location)
-            reportSections.push(prepareTableDataForExport(serviceData, 'Service Popularity'))
+            reportSections.push(prepareTableDataForExport(serviceData, 'Service Popularity', undefined))
             break
           case 'payments':
             const paymentData = aggregatePaymentMethodData(filteredTransactions, options.dateRange, options.location)
-            reportSections.push(prepareTableDataForExport(paymentData, 'Payment Methods'))
+            reportSections.push(prepareTableDataForExport(paymentData, 'Payment Methods', undefined))
             break
           case 'clients':
             const clientData = aggregateClientRetentionData(filteredTransactions, options.dateRange, options.location)
-            reportSections.push(prepareTableDataForExport(clientData, 'Client Retention'))
+            reportSections.push(prepareTableDataForExport(clientData, 'Client Retention', undefined))
             break
           case 'transactions':
-            reportSections.push(prepareTableDataForExport(filteredTransactions, 'Transaction Details'))
+            reportSections.push(prepareTableDataForExport(filteredTransactions, 'Transaction Details', undefined))
             break
         }
       }
@@ -386,23 +386,23 @@ export default function ReportsPage() {
               break
             case 'appointments':
               const appointmentData = aggregateAppointmentData(filteredTransactions, dateRange, currentLocation)
-              reportData = prepareTableDataForExport(appointmentData, 'Appointments Report')
+              reportData = prepareTableDataForExport(appointmentData, 'Appointments Report', undefined)
               break
             case 'staff':
               const staffData = aggregateStaffPerformanceData(filteredTransactions, staff || [], dateRange, currentLocation)
-              reportData = prepareTableDataForExport(staffData, 'Staff Performance Report')
+              reportData = prepareTableDataForExport(staffData, 'Staff Performance Report', undefined)
               break
             case 'inventory':
               // Mock inventory data for now
-              reportData = prepareTableDataForExport([], 'Inventory Report')
+              reportData = prepareTableDataForExport([], 'Inventory Report', undefined)
               break
             case 'financial':
               // Mock financial data for now
-              reportData = prepareTableDataForExport([], 'Financial Report')
+              reportData = prepareTableDataForExport([], 'Financial Report', undefined)
               break
             case 'client':
               const clientData = aggregateClientRetentionData(filteredTransactions, dateRange, currentLocation)
-              reportData = prepareTableDataForExport(clientData, 'Client Report')
+              reportData = prepareTableDataForExport(clientData, 'Client Report', undefined)
               break
             default:
               continue

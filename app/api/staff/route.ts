@@ -20,6 +20,7 @@ function mapStaffRoleToUserRole(staffRole: string): string {
     'nail_technician': 'STAFF',
     'esthetician': 'STAFF',
     'receptionist': 'STAFF',
+    'sales': 'SALES',
     'staff': 'STAFF',
 
     // Client role
@@ -27,6 +28,9 @@ function mapStaffRoleToUserRole(staffRole: string): string {
   };
 
   const normalizedRole = staffRole.toLowerCase().trim();
+  if (normalizedRole.includes("sales")) {
+    return 'SALES';
+  }
   return roleMapping[normalizedRole] || 'STAFF'; // Default to STAFF if role not found
 }
 
@@ -74,11 +78,6 @@ export async function GET(request: NextRequest) {
               location: true
             }
           },
-          services: {
-            include: {
-              service: true
-            }
-          }
         },
         orderBy: {
           createdAt: 'desc'
@@ -205,6 +204,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, phone, role, locations, status, homeService, employeeNumber, dateOfBirth, qidNumber, passportNumber, qidValidity, passportValidity, medicalValidity, profileImage, profileImageType } = body;
 
+    console.log('POST /api/staff - Creating staff member:', { name, email, role });
+
+    // Validate required fields
+    if (!name || !email || !role) {
+      return NextResponse.json(
+        { error: 'Missing required fields: name, email, and role are required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if user with this email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'A user with this email already exists' },
+        { status: 409 }
+      );
+    }
+
     // Try to create in database first
     try {
       // Create user first with enhanced password security
@@ -230,7 +251,15 @@ export async function POST(request: NextRequest) {
           avatar: name.split(' ').map(n => n[0]).join(''),
           color: 'bg-purple-100 text-purple-800',
           jobRole: role, // Store the specific job role
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+          dateOfBirth: dateOfBirth ? (() => {
+            try {
+              const date = new Date(dateOfBirth);
+              return isNaN(date.getTime()) ? null : date;
+            } catch (e) {
+              console.warn('Invalid dateOfBirth:', dateOfBirth);
+              return null;
+            }
+          })() : null,
           homeService: homeService || false,
           status: status === 'Active' ? 'ACTIVE' : status === 'Inactive' ? 'INACTIVE' : 'ON_LEAVE',
           // HR Document Management Fields
@@ -330,8 +359,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error creating staff:', error);
+    console.error('Error details:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to create staff member' },
+      { 
+        error: 'Failed to create staff member',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

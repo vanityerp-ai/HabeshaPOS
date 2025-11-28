@@ -147,7 +147,8 @@ export async function GET(request: NextRequest) {
             price: Number(s.price),
             duration: s.duration,
             staffId: s.staffId,
-            staffName: s.staff?.name || null
+            staffName: s.staff?.name || null,
+            completed: s.completed // surface per-service completion for calendar + availability
           };
         }),
         products: appointment.products.map(p => ({
@@ -282,7 +283,8 @@ export async function POST(request: NextRequest) {
       serviceId: as.serviceId,
       name: as.service.name,
       price: Number(as.price),
-      duration: as.duration || as.service.duration
+      duration: as.duration || as.service.duration,
+      completed: as.completed
     }));
 
     // Transform response

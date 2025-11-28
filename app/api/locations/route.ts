@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    console.log(`📊 Found ${locations.length} active locations in database`)
+
     // Transform locations to match expected format
     const transformedLocations = locations.map(location => ({
       id: location.id,
@@ -32,23 +34,35 @@ export async function GET(request: NextRequest) {
     }))
 
     // Apply user-based access control
-    const currentUser = getUserFromHeaders(request);
     let filteredLocations = transformedLocations;
-
-    if (currentUser) {
-      console.log(`🔍 Current user: ${currentUser.email}, Role: ${currentUser.role}, Locations: ${JSON.stringify(currentUser.locations)}`);
-      filteredLocations = filterLocationsByAccess(transformedLocations, currentUser.locations || [], currentUser.role);
-      console.log(`🔒 Filtered locations by user access: ${filteredLocations.length}/${transformedLocations.length} locations visible to user`);
-      console.log(`🔒 Visible locations: ${filteredLocations.map(loc => loc.name).join(', ')}`);
-    } else {
-      console.log("🔍 No authenticated user found, returning all locations");
+    
+    try {
+      const currentUser = getUserFromHeaders(request);
+      
+      if (currentUser) {
+        console.log(`🔍 Current user ID: ${currentUser.id}, Role: ${currentUser.role}, Locations: ${JSON.stringify(currentUser.locations)}`);
+        filteredLocations = filterLocationsByAccess(transformedLocations, currentUser.locations || [], currentUser.role || undefined);
+        console.log(`🔒 Filtered locations by user access: ${filteredLocations.length}/${transformedLocations.length} locations visible to user`);
+        console.log(`🔒 Visible locations: ${filteredLocations.map(loc => loc.name).join(', ')}`);
+      } else {
+        console.log("🔍 No authenticated user found in headers, returning all locations");
+      }
+    } catch (filterError) {
+      console.warn("⚠️ Error filtering locations by user access, returning all locations:", filterError);
+      // If filtering fails, return all locations to avoid breaking the app
+      filteredLocations = transformedLocations;
     }
 
     console.log(`✅ Successfully fetched ${filteredLocations.length} locations`)
     return NextResponse.json({ locations: filteredLocations })
   } catch (error) {
     console.error("❌ Error fetching locations:", error)
-    return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 })
+    console.error("❌ Error details:", error instanceof Error ? error.message : String(error))
+    console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    return NextResponse.json({ 
+      error: "Failed to fetch locations",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 

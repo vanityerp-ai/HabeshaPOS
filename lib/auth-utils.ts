@@ -113,8 +113,13 @@ export function mapStaffRoleToUserRole(staffRole: string): string {
     'esthetician': 'STAFF',
     'barber': 'STAFF',
     'receptionist': 'STAFF',
+    'sales': 'SALES',
     'trainee': 'STAFF'
   }
   
-  return roleMapping[staffRole.toLowerCase()] || 'STAFF'
+  const normalizedRole = staffRole.toLowerCase().trim()
+  if (normalizedRole.includes("sales")) {
+    return 'SALES'
+  }
+  return roleMapping[normalizedRole] || 'STAFF'
 }

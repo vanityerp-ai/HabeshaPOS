@@ -50,7 +50,8 @@ export class ApiStaffService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create staff: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Failed to create staff: ${response.statusText}`);
       }
 
       const data = await response.json();

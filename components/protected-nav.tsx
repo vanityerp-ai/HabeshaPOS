@@ -17,7 +17,7 @@ interface ProtectedNavProps extends React.HTMLAttributes<HTMLElement> {
 
 export function ProtectedNav({ className, items, ...props }: ProtectedNavProps) {
   const pathname = usePathname()
-  const { hasAnyPermission, hasPermission } = useAuth()
+  const { user, hasAnyPermission } = useAuth()
 
   const defaultItems = [
     {
@@ -79,12 +79,28 @@ export function ProtectedNav({ className, items, ...props }: ProtectedNavProps) 
   ]
 
   const navItems = items || defaultItems
-
-  // Get user role
-  const { user } = useAuth()
+  const roleUpper = user?.role?.toUpperCase() || ""
+  const isSalesRole = roleUpper === "SALES"
+  const isStaffRole = roleUpper === "STAFF"
+  const salesAllowedRoutes = new Set(["/dashboard/pos", "/dashboard/inventory"])
+  const staffAllowedRoutes = new Set(["/dashboard/appointments", "/dashboard/services"])
 
   // Filter navigation items based on user permissions
   const filteredNavItems = navItems.filter(item => {
+    // Restrict sales users to POS and Inventory only
+    if (isSalesRole) {
+      return salesAllowedRoutes.has(item.href)
+    }
+
+    if (isStaffRole) {
+      return staffAllowedRoutes.has(item.href)
+    }
+
+    // Hide Clients menu entirely for Staff users
+    if (roleUpper === "STAFF" && item.href === "/dashboard/clients") {
+      return false
+    }
+
     const requiredPermissions = NAVIGATION_PERMISSIONS[item.href as keyof typeof NAVIGATION_PERMISSIONS]
 
     // If no permissions are defined for this route, hide it
@@ -93,7 +109,7 @@ export function ProtectedNav({ className, items, ...props }: ProtectedNavProps) 
     }
 
     // Special case for POS - ensure it's visible for receptionists
-    if (item.href === "/dashboard/pos" && user?.role === "receptionist") {
+    if (item.href === "/dashboard/pos" && roleUpper === "RECEPTIONIST") {
       return true
     }
 

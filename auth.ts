@@ -102,9 +102,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null
           }
 
+          const normalizedRole = (user.role || 'STAFF').toUpperCase()
+
           // Get user locations from staff profile
           let locationIds: string[] = []
-          if (user.staffProfile?.locations) {
+          if (normalizedRole === "ADMIN") {
+            locationIds = ["all"]
+          } else if (normalizedRole === "SALES") {
+            locationIds = ["online"]
+          } else if (user.staffProfile?.locations) {
             locationIds = user.staffProfile.locations
               .filter(sl => sl.isActive)
               .map(sl => sl.location.id)
@@ -117,8 +123,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: user.id,
             name: user.staffProfile?.name || user.email.split('@')[0],
             email: user.email,
-            role: user.role,
-            locations: user.role === "ADMIN" ? ["all"] : locationIds,
+            role: normalizedRole,
+            locations: locationIds.length > 0
+              ? locationIds
+              : (normalizedRole === "SALES" ? ["online"] : []),
           }
         } catch (error) {
           console.error("Auth error:", error)

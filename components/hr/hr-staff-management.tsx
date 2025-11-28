@@ -289,10 +289,11 @@ export function HRStaffManagement({ search }: HRStaffManagementProps) {
       }
     } catch (error) {
       console.error("Error adding staff:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to add staff member. Please try again.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add staff member. Please try again.",
+        description: errorMessage,
       })
     }
   }

@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ services: transformedServices })
   } catch (error) {
     console.error("❌ Error fetching services:", error)
-    return NextResponse.json({ error: "Failed to fetch services" }, { status: 500 })
+    console.error("❌ Error details:", error instanceof Error ? error.message : String(error))
+    console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    return NextResponse.json({ 
+      error: "Failed to fetch services",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 

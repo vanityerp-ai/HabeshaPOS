@@ -231,7 +231,19 @@ export function EnhancedSalonCalendar({
         }
 
         console.log(`✅ Created fallback staff object for user "${user.name}"`)
-        locationStaff = [fallbackStaff]
+        locationStaff = [{
+          id: 'fallback-staff',
+          name: 'Fallback Staff',
+          email: 'fallback@example.com',
+          phone: '',
+          role: 'STAFF',
+          locations: [currentLocation],
+          status: 'Active' as 'Active' | 'Inactive',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          color: '#3b82f6',
+          homeService: false
+        }]
       }
     }
   }
@@ -286,8 +298,17 @@ export function EnhancedSalonCalendar({
     });
   }
 
+  // Define TimeSlot interface
+  interface TimeSlot {
+    hour: number;
+    minute: number;
+    label: string;
+    fullLabel: string;
+    isHourStart: boolean;
+  }
+  
   // Create time slots for day view (9 AM to 11 PM with 15-minute intervals)
-  const timeSlots = []
+  const timeSlots: TimeSlot[] = []
   for (let hour = 9; hour <= 23; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
       timeSlots.push({
@@ -325,15 +346,21 @@ export function EnhancedSalonCalendar({
           // Display additional service on the grid if it has a staff assigned
           // This makes the staff unavailable and shows the booking details
           if (service.staffId) {
+            const serviceCompleted = service.completed ?? appointment.status === "completed";
             // Create a new appointment-like object for this additional service
             // IMPORTANT: Set status to "service-started" if the service is not completed,
             // even if the parent appointment has a "completed" status.
-            // This ensures the additional service remains visible on the calendar
-            // until it is explicitly marked as completed.
-            const serviceStatus = service.completed ? "completed" : "service-started";
+            // Set status based on completion - if service is completed, mark as completed
+            // otherwise use "service-started" to ensure visibility on calendar
+            const serviceStatus = serviceCompleted ? "completed" : "service-started";
             
+            // Generate a consistent ID for the additional service
+            const additionalServiceId = service.id ? 
+              `${appointment.id}-service-${service.id}` : 
+              `${appointment.id}-service-${service.serviceId || Date.now()}`;
+              
             allAppointments.push({
-              id: `${appointment.id}-service-${service.id || Date.now()}`,
+              id: additionalServiceId,
               clientId: appointment.clientId,
               clientName: appointment.clientName,
               date: service.date || appointment.date, // Use the service date if available, otherwise use the parent appointment date
@@ -347,7 +374,9 @@ export function EnhancedSalonCalendar({
               isAdditionalService: true,
               parentAppointmentId: appointment.id,
               additionalServiceInfo: `Additional service for ${appointment.clientName}`,
-              completed: service.completed || false
+              completed: serviceCompleted,
+              // Add serviceId for proper identification
+              serviceId: service.serviceId || service.id
             });
           }
         });
@@ -693,15 +722,12 @@ export function EnhancedSalonCalendar({
       }
 
       // Check if staff is assigned to any additional service
-      const isAssignedToAdditionalService = appointment.additionalServices &&
-        appointment.additionalServices.some((s: any) => s.staffId === staffId);
-
-      // If staff is assigned to an additional service but has completed it, they are available
-      if (isAssignedToAdditionalService && appointment.additionalServices) {
-        const staffService = appointment.additionalServices.find((s: any) => s.staffId === staffId);
-        if (staffService && staffService.completed) {
-          return false;
-        }
+      // For additional service appointments, check if this is the assigned staff member
+      const isAssignedToAdditionalService = appointment.isAdditionalService && appointment.staffId === staffId;
+      
+      // If this is an additional service and the staff has completed it, they are available
+      if (isAssignedToAdditionalService && appointment.completed) {
+        return false; // Staff is available if they've completed their additional service
       }
 
       // If staff is not involved in this appointment at all, skip

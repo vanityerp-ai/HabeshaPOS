@@ -5,6 +5,7 @@ import { EnhancedSalonCalendar } from "@/components/scheduling/enhanced-salon-ca
 import { EnhancedAppointmentDetailsDialog } from "@/components/scheduling/enhanced-appointment-details-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/auth-provider"
+import { useSalesRouteGuard } from "@/hooks/use-sales-route-guard"
 import { ServiceStorage } from "@/lib/service-storage"
 import { parseISO, format } from "date-fns"
 import { AppointmentStatus } from "@/lib/types/appointment"
@@ -20,8 +21,21 @@ import { useEntityChanges } from "@/hooks/use-real-time-sync"
 
 export default function AppointmentsPage() {
   const { toast } = useToast()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const { addTransaction, transactions } = useTransactions()
+  useSalesRouteGuard()
+
+  // CRITICAL: Block SALES role from accessing appointments page
+  // SALES role should ONLY access POS and Inventory
+  const isSalesRole = user?.role?.toUpperCase() === "SALES"
+  if (isSalesRole) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the appointments page. As a Sales staff member, you can only access the Point of Sale and Inventory pages."
+        backButtonHref="/dashboard/pos"
+      />
+    )
+  }
 
   // Check if user has permission to view appointments page
   if (!hasPermission("view_appointments") && !hasPermission("view_own_appointments")) {
@@ -779,6 +793,7 @@ export default function AppointmentsPage() {
               price: 0, // No price - part of parent appointment
               notes: appointment.notes,
               status: service.completed ? 'completed' : appointment.status, // Use service's completed status
+              completed: !!service.completed,
               type: 'additional-service-block',
               isVisualBlockingOnly: true, // Flag to indicate this is UI-only
               parentAppointmentId: appointment.id,

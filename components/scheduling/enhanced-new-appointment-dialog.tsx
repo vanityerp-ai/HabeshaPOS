@@ -24,6 +24,7 @@ import { ClientSearchDialog } from "@/components/pos/client-search-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useApiStaff } from "@/lib/api-staff-service"
 import { useServices } from "@/lib/service-provider"
+import { getFirstName } from "@/lib/female-avatars"
 
 // Helper function to check if user has admin privileges
 const hasAdminPrivileges = (hasPermissionFn: (permission: string) => boolean) => {
@@ -291,7 +292,7 @@ export function EnhancedNewAppointmentDialog({
                     ) : (
                       filteredStaff.map((staff) => (
                         <SelectItem key={staff.id} value={staff.id}>
-                          {staff.name} - {(staff.role || "Staff").replace("_", " ")}
+                          {getFirstName(staff.name)} - {(staff.role || "Staff").replace("_", " ")}
                         </SelectItem>
                       ))
                     )}

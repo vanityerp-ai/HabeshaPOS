@@ -24,7 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useTransactions } from "@/lib/transaction-provider"
 import { PaymentMethod } from "@/lib/transaction-types"
 import { ConsolidatedTransactionService } from "@/lib/consolidated-transaction-service"
-import { printReceipt } from "@/components/accounting/receipt-printer.ts"
+import { printReceipt } from "@/components/accounting/receipt-printer"
 import { Transaction } from "@/lib/transaction-types"
 import { generateSequentialTransactionId } from "@/lib/transaction-utils"
 
@@ -473,9 +473,22 @@ export function EnhancedBookingSummary({
     // Update the bookings with the new status and add to statusHistory
     const updatedBookings = bookings.map((booking) => {
       if (booking.id === id) {
+        // If the booking is being marked as completed, also mark all additional services as completed
+        let updatedItems = booking.items;
+        if (newStatus === "completed") {
+          updatedItems = booking.items.map(item => {
+            // Mark all service items as completed (but preserve products)
+            if (item.type === "service") {
+              return { ...item, completed: true };
+            }
+            return item;
+          });
+        }
+
         return {
           ...booking,
           status: newStatus,
+          items: updatedItems,
           // Add the status change to the statusHistory if it exists
           statusHistory: booking.statusHistory ? [
             ...booking.statusHistory,
@@ -504,10 +517,23 @@ export function EnhancedBookingSummary({
       // Convert back to appointment format for parent component
       const originalAppointment = appointments.find((a) => a.id === id);
       if (originalAppointment) {
+        // If the booking is being marked as completed, also mark all additional services as completed
+        let updatedAdditionalServices = originalAppointment.additionalServices;
+        if (newStatus === "completed" && originalAppointment.additionalServices) {
+          updatedAdditionalServices = originalAppointment.additionalServices.map((service: any) => ({
+            ...service,
+            completed: true
+          }));
+        }
+
         // Create the updated appointment with status history
         const updatedAppointment = {
           ...originalAppointment,
           status: newStatus,
+          // Update additional services if the booking is completed
+          ...(newStatus === "completed" && updatedAdditionalServices && {
+            additionalServices: updatedAdditionalServices
+          }),
           // Add the status change to the statusHistory if it exists
           statusHistory: originalAppointment.statusHistory ? [
             ...originalAppointment.statusHistory,
@@ -660,7 +686,22 @@ export function EnhancedBookingSummary({
     const booking = bookings.find((b) => b.id === bookingId)
     const item = booking?.items.find((i) => i.id === itemId)
 
-    if (!booking || !item || item.type !== "service" || !item.staffId) return
+    // Validation
+    if (!booking || !item || item.type !== "service" || !item.staffId) {
+      const errorMsg = `Invalid data for staff service completion: booking=${!!booking}, item=${!!item}, type=${item?.type}, staffId=${item?.staffId}`;
+      console.error(errorMsg);
+      // Log error for tracking
+      console.error("STAFF_SERVICE_COMPLETE_ERROR: Invalid data", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        itemId,
+        bookingExists: !!booking,
+        itemExists: !!item,
+        itemType: item?.type,
+        staffId: item?.staffId
+      });
+      return;
+    }
 
     // Update the bookings state by marking the service as completed
     const updatedBookings = bookings.map((booking) => {
@@ -713,7 +754,39 @@ export function EnhancedBookingSummary({
         setTimeout(() => {
           onBookingUpdate(updatedAppointment)
         }, 0)
+
+        // Also update the calendar to reflect staff availability change
+        console.log("Staff service completed, updating calendar availability for staff:", item.staffId);
+        
+        // Log success for tracking
+        console.log("STAFF_SERVICE_COMPLETED_SUCCESS", {
+          timestamp: new Date().toISOString(),
+          bookingId,
+          itemId,
+          staffId: item.staffId,
+          staffName: item.staff
+        });
+      } else {
+        const errorMsg = `Original appointment not found for staff service completion: ${bookingId}`;
+        console.error(errorMsg);
+        // Log error for tracking
+        console.error("STAFF_SERVICE_COMPLETE_ERROR: Original appointment not found", {
+          timestamp: new Date().toISOString(),
+          bookingId,
+          itemId
+        });
       }
+    } else {
+      const errorMsg = `Booking update failed for staff service completion: bookingId=${bookingId}`;
+      console.error(errorMsg);
+      // Log error for tracking
+      console.error("STAFF_SERVICE_COMPLETE_ERROR: Booking update failed", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        itemId,
+        hasUpdatedBooking: !!updatedBooking,
+        hasOnBookingUpdate: !!onBookingUpdate
+      });
     }
 
     toast({
@@ -728,10 +801,35 @@ export function EnhancedBookingSummary({
     const booking = bookings.find((b) => b.id === bookingId)
     const item = booking?.items.find((i) => i.id === itemId)
 
-    if (!booking || !item) return
+    // Validation
+    if (!booking || !item) {
+      const errorMsg = `Invalid data for item deletion: booking=${!!booking}, item=${!!item}`;
+      console.error(errorMsg);
+      // Log error for tracking
+      console.error("ITEM_DELETE_ERROR: Invalid data", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        itemId,
+        bookingExists: !!booking,
+        itemExists: !!item
+      });
+      return;
+    }
 
     // Check if this is the primary service (first item in the array)
-    const isPrimaryService = booking.items.indexOf(item) === 0
+    const isPrimaryService = booking.items.indexOf(item) === 0;
+    
+    // Prevent deletion of the only service in a booking
+    if (isPrimaryService && booking.items.filter(i => i.type === "service").length === 1) {
+      console.warn("Cannot delete the only service in a booking");
+      // Log warning for tracking
+      console.warn("ITEM_DELETE_WARNING: Attempt to delete only service", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        itemId
+      });
+      return;
+    }
 
     // Update the parent component
     if (onBookingUpdate) {
@@ -750,34 +848,98 @@ export function EnhancedBookingSummary({
             staffId: nextService ? nextService.staffId : originalAppointment.staffId,
             staffName: nextService ? nextService.staff : originalAppointment.staffName
           })
+          
+          // Log success for tracking
+          console.log("PRIMARY_SERVICE_DELETED_SUCCESS", {
+            timestamp: new Date().toISOString(),
+            bookingId,
+            itemId
+          });
         } else if (item.type === "service") {
           // Remove the service from additionalServices
+          // Use the item ID for more precise matching
           const updatedServices = originalAppointment.additionalServices
-            ? originalAppointment.additionalServices.filter((service: any) => service.name !== item.name)
+            ? originalAppointment.additionalServices.filter((service: any) => service.id !== itemId)
             : []
 
           onBookingUpdate({
             ...originalAppointment,
             additionalServices: updatedServices
           })
+          
+          // Also update the calendar to reflect staff availability change
+          console.log("Additional service deleted, updating calendar availability for staff:", item.staffId);
+          
+          // Log success for tracking
+          console.log("ADDITIONAL_SERVICE_DELETED_SUCCESS", {
+            timestamp: new Date().toISOString(),
+            bookingId,
+            itemId,
+            staffId: item.staffId
+          });
         } else {
           // Remove the product from products
+          // Use the item ID for more precise matching
           const updatedProducts = originalAppointment.products
-            ? originalAppointment.products.filter((product: any) => product.name !== item.name)
+            ? originalAppointment.products.filter((product: any) => product.id !== itemId)
             : []
 
           onBookingUpdate({
             ...originalAppointment,
             products: updatedProducts
           })
+          
+          // Log success for tracking
+          console.log("PRODUCT_DELETED_SUCCESS", {
+            timestamp: new Date().toISOString(),
+            bookingId,
+            itemId
+          });
         }
+      } else {
+        const errorMsg = `Original appointment not found for item deletion: ${bookingId}`;
+        console.error(errorMsg);
+        // Log error for tracking
+        console.error("ITEM_DELETE_ERROR: Original appointment not found", {
+          timestamp: new Date().toISOString(),
+          bookingId,
+          itemId
+        });
       }
+    } else {
+      const errorMsg = `onBookingUpdate callback not available for item deletion: bookingId=${bookingId}`;
+      console.error(errorMsg);
+      // Log error for tracking
+      console.error("ITEM_DELETE_ERROR: onBookingUpdate callback missing", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        itemId,
+        hasOnBookingUpdate: !!onBookingUpdate
+      });
     }
   }
 
   // Handle service added
   const handleServiceAdded = (bookingId: string, service: any) => {
     console.log("handleServiceAdded called with:", { bookingId, service });
+
+    // Validation
+    if (!service || !service.id || !service.name || !service.staffId) {
+      const errorMsg = `Invalid service data provided to handleServiceAdded: ${JSON.stringify(service)}`;
+      console.error(errorMsg);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Invalid service data. Please try again.",
+      });
+      // Log error for tracking
+      console.error("SERVICE_ADD_ERROR: Invalid service data", {
+        timestamp: new Date().toISOString(),
+        serviceData: service,
+        bookingId
+      });
+      return;
+    }
 
     // Set the updating flag to prevent infinite loops
     isUpdatingRef.current = true;
@@ -792,7 +954,8 @@ export function EnhancedBookingSummary({
       duration: service.duration,
       staff: service.staff,
       staffId: service.staffId,
-      serviceId: service.serviceId  // The actual database service ID
+      serviceId: service.serviceId,  // The actual database service ID
+      completed: false  // Explicitly set completed status
     };
 
     console.log("Created new service item with serviceId:", newServiceItem);
@@ -836,7 +999,9 @@ export function EnhancedBookingSummary({
           // Include client info for the calendar display
           clientId: originalAppointment.clientId,
           clientName: originalAppointment.clientName,
-          clientEmail: originalAppointment.clientEmail
+          clientEmail: originalAppointment.clientEmail,
+          // Ensure completed status is properly set
+          completed: false
         };
 
         console.log("Created additional service for appointment:", additionalService);
@@ -865,7 +1030,13 @@ export function EnhancedBookingSummary({
           console.log("🔵 EnhancedBookingSummary: Calling onBookingUpdate callback");
           onBookingUpdate(updatedAppointment);
         } else {
-          console.error("❌ EnhancedBookingSummary: onBookingUpdate callback is not defined!");
+          const errorMsg = "❌ EnhancedBookingSummary: onBookingUpdate callback is not defined!";
+          console.error(errorMsg);
+          // Log error for tracking
+          console.error("SERVICE_ADD_ERROR: onBookingUpdate callback missing", {
+            timestamp: new Date().toISOString(),
+            appointmentId: updatedAppointment.id
+          });
         }
 
         // Show a toast notification with the specific service details
@@ -874,10 +1045,34 @@ export function EnhancedBookingSummary({
           description: `Added ${service.name} with ${service.staff} to the booking.`,
         });
       } else {
-        console.error("Original appointment not found for ID:", bookingId);
+        const errorMsg = `Original appointment not found for ID: ${bookingId}`;
+        console.error(errorMsg);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not find the original appointment.",
+        });
+        // Log error for tracking
+        console.error("SERVICE_ADD_ERROR: Original appointment not found", {
+          timestamp: new Date().toISOString(),
+          bookingId
+        });
       }
     } else {
-      console.error("Updated booking or onBookingUpdate not available");
+      const errorMsg = "Updated booking or onBookingUpdate not available";
+      console.error(errorMsg);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update the booking. Please try again.",
+      });
+      // Log error for tracking
+      console.error("SERVICE_ADD_ERROR: Booking update failed", {
+        timestamp: new Date().toISOString(),
+        bookingId,
+        hasUpdatedBooking: !!updatedBooking,
+        hasOnBookingUpdate: !!onBookingUpdate
+      });
     }
   }
 
@@ -1257,7 +1452,7 @@ export function EnhancedBookingSummary({
                     </div>
                     {item.staff && (
                       <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-500">with {item.staff}</p>
+                        <p className="text-xs text-gray-500">with {getFirstName(item.staff)}</p>
 
                         {/* Complete button for staff services - only visible in service-started tab */}
                         {booking.status === "service-started" &&

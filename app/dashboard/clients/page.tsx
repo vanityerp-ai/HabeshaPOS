@@ -22,11 +22,13 @@ export default function ClientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Check if user has permission to view clients page
-  if (!hasPermission("view_clients")) {
+  // Strict access control - only Admin can access clients page
+  const isAdmin = user?.role === "ADMIN";
+  
+  if (!isAdmin) {
     return (
       <AccessDenied
-        description="You don't have permission to view the client management page."
+        description="You don't have permission to view the client management page. Only Admin users can access this page."
         backButtonHref="/dashboard/appointments"
       />
     )

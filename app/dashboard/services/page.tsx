@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-provider"
+import { useSalesRouteGuard } from "@/hooks/use-sales-route-guard"
 import { useLocations } from "@/lib/location-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,11 +16,23 @@ import { AccessDenied } from "@/components/access-denied"
 import { Plus, Search } from "lucide-react"
 
 export default function ServicesPage() {
-  const { currentLocation, hasPermission } = useAuth()
+  const { currentLocation, hasPermission, user } = useAuth()
   const { getLocationName, refreshLocations } = useLocations()
   const [search, setSearch] = useState("")
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  useSalesRouteGuard()
+
+  // CRITICAL: Block SALES role from accessing services management page
+  const isSalesRole = user?.role?.toUpperCase() === "SALES"
+  if (isSalesRole) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view the services management page. As a Sales staff member, you can only access the Point of Sale and Inventory pages."
+        backButtonHref="/dashboard/pos"
+      />
+    )
+  }
 
   // Check if user has permission to view services page
   if (!hasPermission("view_services")) {

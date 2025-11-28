@@ -19,6 +19,10 @@ import { ChatInterface } from "@/components/chat/chat-interface"
 import { NotificationCenter } from "@/components/notifications/notification-center"
 import { AppointmentNotificationHandler } from "@/components/notifications/appointment-notification-handler"
 import { DashboardLogo } from "@/components/ui/logo"
+import { useSalesRouteGuard } from "@/hooks/use-sales-route-guard"
+import { DashboardRouteProtector } from "@/components/dashboard-route-protector"
+
+const STAFF_ALLOWED_ROUTES = ["/dashboard/appointments", "/dashboard/services"] as const
 
 
 export default function DashboardLayout({
@@ -28,6 +32,9 @@ export default function DashboardLayout({
 }) {
   const { user, isAuthenticated, hasPermission } = useAuth()
   const router = useRouter()
+
+  useSalesRouteGuard()
+  useSalesRouteGuard(STAFF_ALLOWED_ROUTES, "STAFF", "/dashboard/appointments")
 
   // Memoize the logo component to prevent re-renders
   const logoComponent = useMemo(() => {
@@ -60,37 +67,39 @@ export default function DashboardLayout({
 
   return (
     <AdminThemeProvider>
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-50 flex h-16 items-center border-b bg-background px-4 md:px-6">
-          <div className="flex items-center gap-4 md:gap-6">
-            {logoComponent}
-            <LocationSelector />
+      <DashboardRouteProtector>
+        <div className="flex min-h-screen flex-col">
+          <header className="sticky top-0 z-50 flex h-16 items-center border-b bg-background px-4 md:px-6">
+            <div className="flex items-center gap-4 md:gap-6">
+              {logoComponent}
+              <LocationSelector />
+            </div>
+            <ProtectedNav className="mx-6" />
+            <div className="ml-auto flex items-center gap-4">
+              <NotificationAudioToggle />
+              <Notifications />
+              <NotificationCenter />
+              <ChatNotifications />
+              <AdminModeToggle />
+              <UserNav />
+            </div>
+          </header>
+          <div className="flex flex-1">
+            <main className="flex-1 p-4 md:p-6">{children}</main>
           </div>
-          <ProtectedNav className="mx-6" />
-          <div className="ml-auto flex items-center gap-4">
-            <NotificationAudioToggle />
-            <Notifications />
-            <NotificationCenter />
-            <ChatNotifications />
-            <AdminModeToggle />
-            <UserNav />
-          </div>
-        </header>
-        <div className="flex flex-1">
-          <main className="flex-1 p-4 md:p-6">{children}</main>
+
+          {/* Chat Interface */}
+          <ChatInterface />
+
+          {/* Appointment Notification Handler */}
+          <AppointmentNotificationHandler
+            onViewAppointment={(appointmentId) => {
+              // Navigate to calendar with appointment highlighted
+              window.location.href = `/dashboard/appointments?highlight=${appointmentId}`
+            }}
+          />
         </div>
-
-        {/* Chat Interface */}
-        <ChatInterface />
-
-        {/* Appointment Notification Handler */}
-        <AppointmentNotificationHandler
-          onViewAppointment={(appointmentId) => {
-            // Navigate to calendar with appointment highlighted
-            window.location.href = `/dashboard/appointments?highlight=${appointmentId}`
-          }}
-        />
-      </div>
+      </DashboardRouteProtector>
     </AdminThemeProvider>
   )
 }

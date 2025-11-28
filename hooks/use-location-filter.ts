@@ -6,6 +6,8 @@ import { useMemo } from "react"
  */
 export function useLocationFilter() {
   const { data: session } = useSession()
+  const roleUpper = session?.user?.role?.toUpperCase() || ""
+  const isSalesRole = roleUpper === "SALES"
 
   const userLocations = useMemo(() => {
     if (!session?.user?.locations) return []
@@ -16,16 +18,18 @@ export function useLocationFilter() {
     if (!session?.user) return true // Allow access if not authenticated (for public data)
 
     // Admin users have access to all locations
-    if (session.user.role === "ADMIN") return true
+    if (roleUpper === "ADMIN") return true
 
     // If user has "all" in their locations, they can access all locations
     if (userLocations.includes("all")) return true
 
-    // Online store is only accessible to admin users
-    if (locationId === "online") return session.user.role === "ADMIN"
+    // Online store is accessible to admin and sales users
+    if (locationId === "online") {
+      return session.user.role === "ADMIN" || isSalesRole
+    }
 
     // Home service is only accessible to admin users (staff users are blocked)
-    if (locationId === "home") return session.user.role === "ADMIN"
+    if (locationId === "home") return roleUpper === "ADMIN"
 
     // Check if the location is in the user's assigned locations
     return userLocations.includes(locationId)
@@ -35,14 +39,19 @@ export function useLocationFilter() {
     if (!session?.user) return locations // Return all if not authenticated
 
     // Admin users see all locations
-    if (session.user.role === "ADMIN") return locations
+    if (roleUpper === "ADMIN") return locations
+
+    // Sales users are limited to online store only
+    if (isSalesRole) {
+      return locations.filter(location => location.id === "online")
+    }
 
     // If user has "all" access, return all locations (but still filter online for non-admin)
     if (userLocations.includes("all")) {
       return locations.filter(location => {
         // Even with "all" access, non-admin users cannot see online store
         if (location.id === "online") {
-          return session.user.role === "ADMIN"
+          return roleUpper === "ADMIN" || isSalesRole
         }
         return true
       })
@@ -52,7 +61,7 @@ export function useLocationFilter() {
     return locations.filter(location => {
       // Online store is only accessible to admin users
       if (location.id === "online") {
-        return session.user.role === "ADMIN"
+        return roleUpper === "ADMIN" || isSalesRole
       }
 
       // Always include home service
@@ -69,7 +78,7 @@ export function useLocationFilter() {
     if (!session?.user) return staff // Return all if not authenticated
     
     // Admin users see all staff
-    if (session.user.role === "ADMIN") return staff
+    if (roleUpper === "ADMIN") return staff
     
     // If user has "all" access, return all staff
     if (userLocations.includes("all")) return staff
@@ -85,14 +94,19 @@ export function useLocationFilter() {
     if (!session?.user) return appointments // Return all if not authenticated
 
     // Admin users see all appointments
-    if (session.user.role === "ADMIN") return appointments
+    if (roleUpper === "ADMIN") return appointments
+
+    // Sales users see only online appointments
+    if (isSalesRole) {
+      return appointments.filter(appointment => appointment.location === "online")
+    }
 
     // If user has "all" access, return all appointments (but still filter online for non-admin)
     if (userLocations.includes("all")) {
       return appointments.filter(appointment => {
         // Even with "all" access, non-admin users cannot see online store appointments
         if (appointment.location === "online") {
-          return session.user.role === "ADMIN"
+          return roleUpper === "ADMIN" || isSalesRole
         }
         return true
       })
@@ -102,12 +116,12 @@ export function useLocationFilter() {
     return appointments.filter(appointment => {
       // Online store appointments are only accessible to admin users
       if (appointment.location === "online") {
-        return session.user.role === "ADMIN"
+        return roleUpper === "ADMIN" || isSalesRole
       }
 
       // Home service appointments are only accessible to admin users (staff users are blocked)
       if (appointment.location === "home") {
-        return session.user.role === "ADMIN"
+        return roleUpper === "ADMIN"
       }
 
       // For regular locations, check user permissions
@@ -115,9 +129,9 @@ export function useLocationFilter() {
     })
   }
 
-  const isAdmin = session?.user?.role === "ADMIN"
-  const isStaff = session?.user?.role === "STAFF"
-  const isManager = session?.user?.role === "MANAGER"
+  const isAdmin = roleUpper === "ADMIN"
+  const isStaff = roleUpper === "STAFF"
+  const isManager = roleUpper === "MANAGER"
 
   return {
     userLocations,

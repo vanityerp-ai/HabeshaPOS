@@ -16,6 +16,7 @@ import { useServices } from "@/lib/service-provider"
 import { ServiceStorage, Service, ServiceCategory } from "@/lib/service-storage"
 import { useProducts } from "@/lib/product-provider"
 import { Product } from "@/lib/product-provider"
+import { getFirstName } from "@/lib/female-avatars"
 
 interface PersonalizedRecommendationsProps {
   clientId: string
@@ -87,9 +88,12 @@ export function PersonalizedRecommendations({
     let score = 0
 
     // Base score for popular/featured services
-    if (service.isPopular) score += 30
-    if (service.isFeatured) score += 20
-    if (service.isNew) score += 10
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isPopular) score += 30
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isFeatured) score += 20
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isNew) score += 10
 
     // Score based on price range (mid-range services get higher scores)
     if (service.price >= 50 && service.price <= 200) score += 15
@@ -118,9 +122,12 @@ export function PersonalizedRecommendations({
       "Great value for the quality"
     ]
 
-    if (service.isPopular) return "Popular with clients like you"
-    if (service.isFeatured) return "Featured service this month"
-    if (service.isNew) return "New service - try something different"
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isPopular) return "Popular with clients like you"
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isFeatured) return "Featured service this month"
+    // @ts-ignore - These properties exist in the actual service objects but not in the type definition
+    if ((service as any).isNew) return "New service - try something different"
 
     return reasons[index % reasons.length]
   }
@@ -188,7 +195,8 @@ export function PersonalizedRecommendations({
           .map(service => ({
             ...service,
             score: calculateRecommendationScore(service),
-            image: service.imageUrl || serviceImages[service.category as keyof typeof serviceImages] || serviceImages["1"],
+            // @ts-ignore - imageUrl property exists in actual service objects
+            image: (service as any).imageUrl || serviceImages[service.category as keyof typeof serviceImages] || serviceImages["1"],
             categoryName: getCategoryName(service.category),
             rating: 4.2 + (Math.random() * 0.8), // Random rating between 4.2-5.0
             reason: getRecommendationReason(service, parseInt(service.id) || 0)
@@ -668,7 +676,7 @@ export function PersonalizedRecommendations({
                       asChild
                     >
                       <Link href={`/client-portal/appointments/book?staffId=${stylist.id}`}>
-                        Book with {stylist.name.split(" ")[0]}
+                        Book with {getFirstName(stylist.name)}
                       </Link>
                     </Button>
                   </div>

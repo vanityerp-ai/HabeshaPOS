@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { ReviewForm, ReviewFormData } from "@/components/client-portal/review-form"
+import { getFirstName } from "@/lib/female-avatars"
 
 export default function AppointmentsPage() {
   const { toast } = useToast()
@@ -88,11 +89,8 @@ export default function AppointmentsPage() {
     }
 
     try {
-      // Initialize the appointment service to ensure data consistency
-      // initializeAppointmentService() // This line is removed as per the new_code
-
       // Get all appointments from the unified service
-      const allAppointments = getAllAppointments()
+      const allAppointments = await getAllAppointments()
 
       // Get current client ID
       const currentClientId = getCurrentClientId()
@@ -349,7 +347,7 @@ export default function AppointmentsPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">{appointment.staffName}</p>
+                  <p className="font-medium">{getFirstName(appointment.staffName)}</p>
                   <p className="text-sm text-gray-600 capitalize">{staffDetails?.role || "Stylist"}</p>
                 </div>
               </div>

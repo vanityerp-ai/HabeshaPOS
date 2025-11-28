@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { useClients, Client } from "@/lib/client-provider"
 import { useTransactions } from "@/lib/transaction-provider"
 import { useLocations } from "@/lib/location-provider"
+import { AccessDenied } from "@/components/access-denied"
 import { EditClientDialog } from "@/components/clients/edit-client-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,12 +49,24 @@ interface ClientProfilePageProps {
 
 export default function ClientProfilePage({ params }: ClientProfilePageProps) {
   const router = useRouter()
-  const { currentLocation } = useAuth()
+  const { user, currentLocation } = useAuth()
   const { getClient } = useClients()
   const { transactions: allTransactions } = useTransactions()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
   const { getLocationName } = useLocations()
+
+  // Strict access control - only Admin can access client details
+  const isAdmin = user?.role === "ADMIN";
+  
+  if (!isAdmin) {
+    return (
+      <AccessDenied
+        description="You don't have permission to view client details. Only Admin users can access this page."
+        backButtonHref="/dashboard/appointments"
+      />
+    );
+  }
   const [client, setClient] = useState<Client | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -379,14 +392,14 @@ export default function ClientProfilePage({ params }: ClientProfilePageProps) {
                           : "bg-yellow-100 text-yellow-800"
                   }
                 >
-                  {client.segment}
+                  {client.segment || "Regular"}
                 </Badge>
               </div>
               <CardDescription>Personal information and contact details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex flex-col items-center text-center">
-                <Avatar className={`h-24 w-24 mb-2 ${client.color || "bg-primary/10"}`}>
+                <Avatar className={`h-24 w-24 mb-2 bg-primary/10`}>
                   <AvatarFallback className="text-2xl">{client.avatar}</AvatarFallback>
                 </Avatar>
                 <h2 className="text-xl font-bold">{client.name}</h2>

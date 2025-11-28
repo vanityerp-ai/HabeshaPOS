@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { useApiStaff } from "@/lib/api-staff-service"
 import { Appointment } from "@/lib/types/appointment"
 import { updateAppointment } from "@/lib/appointment-service"
+import { getFirstName } from "@/lib/female-avatars"
 
 interface RescheduleAppointmentDialogProps {
   open: boolean
@@ -166,6 +167,7 @@ export function RescheduleAppointmentDialog({
       const updatedAppointment = await updateAppointment(appointment.id, updates)
 
       if (updatedAppointment && onAppointmentUpdated) {
+        // @ts-ignore
         onAppointmentUpdated(updatedAppointment)
       }
 
@@ -284,7 +286,7 @@ export function RescheduleAppointmentDialog({
               <SelectContent>
                 {availableStaff.map((staff) => (
                   <SelectItem key={staff.id} value={staff.id}>
-                    {staff.name}
+                    {getFirstName(staff.name)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -296,7 +298,7 @@ export function RescheduleAppointmentDialog({
             <div className="text-sm">
               <div className="font-medium">Current:</div>
               <div className="text-muted-foreground">
-                {formatAppDate(appointment.date)} at {formatAppTime(appointment.date)} with {appointment.staffName}
+                {formatAppDate(appointment.date)} at {formatAppTime(appointment.date)} with {getFirstName(appointment.staffName)}
               </div>
             </div>
             <div className="text-sm">
@@ -305,7 +307,7 @@ export function RescheduleAppointmentDialog({
                 {formatAppDate(formData.date)} at {formatAppTime(set(formData.date, {
                   hours: parseInt(formData.time.split(":")[0]),
                   minutes: parseInt(formData.time.split(":")[1])
-                }))} with {selectedStaff?.name || "Select staff"}
+                }))} with {getFirstName(selectedStaff?.name || "Select staff")}
               </div>
             </div>
           </div>
