@@ -69,7 +69,7 @@ export default function POSPage() {
   }
 
   // State management
-  const [activeTab, setActiveTab] = useState("services")
+  const [activeTab, setActiveTab] = useState("products") // Changed default to products
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [cartItems, setCartItems] = useState<any[]>([])
@@ -647,10 +647,11 @@ export default function POSPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <Tabs defaultValue="services" value={activeTab} onValueChange={setActiveTab}>
+            <Tabs defaultValue="products" value={activeTab} onValueChange={setActiveTab}>
               <div className="px-6">
                 <TabsList className="w-full">
-                  <TabsTrigger value="services" className="flex-1">
+                  {/* Services tab hidden as per user request */}
+                  <TabsTrigger value="services" className="flex-1 hidden">
                     Services
                   </TabsTrigger>
                   <TabsTrigger value="products" className="flex-1">
@@ -769,14 +770,13 @@ export default function POSPage() {
                           <CardHeader className="p-4 pb-2">
                             <div className="flex justify-between items-start mb-2">
                               <CardTitle className="text-base">{product.name}</CardTitle>
-                              {product.type === 'product' && (
-                                <Badge
-                                  variant={(product as any).stock === 0 ? "destructive" : (product as any).stock < 5 ? "secondary" : "outline"}
-                                  className="text-xs font-semibold"
-                                >
-                                  {(product as any).stock === 0 ? "Out" : (product as any).stock < 5 ? `Low: ${(product as any).stock}` : `${(product as any).stock} units`}
-                                </Badge>
-                              )}
+                              {/* Stock badge - always show for products */}
+                              <Badge
+                                variant={product.stock === 0 ? "destructive" : product.stock < 5 ? "secondary" : "outline"}
+                                className="text-xs font-semibold"
+                              >
+                                {product.stock === 0 ? "Out" : product.stock < 5 ? `Low: ${product.stock}` : `${product.stock} units`}
+                              </Badge>
                             </div>
                             <CardDescription>
                               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
@@ -789,10 +789,10 @@ export default function POSPage() {
                             <Button
                               size="sm"
                               onClick={() => addToCart(product, "product")}
-                              disabled={product.type === 'product' && (product as any).stock <= 0}
+                              disabled={product.stock <= 0}
                             >
                               <Plus className="h-4 w-4 mr-1" />
-                              {product.type === 'product' && (product as any).stock <= 0 ? "Out of Stock" : "Add"}
+                              {product.stock <= 0 ? "Out of Stock" : "Add"}
                             </Button>
                           </CardFooter>
                         </Card>
