@@ -147,11 +147,13 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
     }
   }, [currentBooking, realStaff])
 
-  // Staff warnings removed - staff can now have multiple services in the same booking
-  // This useEffect is kept for backwards compatibility but warning is disabled
+  // Check if selected staff is unavailable (but allow if already in current booking)
   useEffect(() => {
-    // No warning for same booking - staff can have multiple services
-    setStaffWarning(null)
+    if (selectedStaff && unavailableStaff.includes(selectedStaff)) {
+      setStaffWarning("This staff member has a conflicting appointment with another client.")
+    } else {
+      setStaffWarning(null)
+    }
   }, [selectedStaff, unavailableStaff])
 
   // Log available categories and services for debugging
@@ -215,8 +217,27 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
     });
   }, [selectedCategory, categoryNameToIdMap, services]);
 
-  // Filter active staff
-  const activeStaff = realStaff.filter((s) => s.status === "Active")
+  // Filter active staff by current booking location
+  const activeStaff = React.useMemo(() => {
+    if (!currentBooking || !realStaff.length) return [];
+    
+    return realStaff.filter((staff) => {
+      // Only show active staff
+      if (staff.status !== "Active") return false;
+      
+      // Filter by location - staff must be assigned to the booking's location
+      // Handle both single location and multiple locations
+      const bookingLocation = currentBooking.location;
+      
+      if (staff.locations && Array.isArray(staff.locations)) {
+        // Check if staff is assigned to this specific location or 'all' locations
+        return staff.locations.includes(bookingLocation) || staff.locations.includes('all');
+      }
+      
+      // Fallback: if no locations array, include the staff
+      return true;
+    });
+  }, [realStaff, currentBooking])
 
   const handleSubmit = async () => {
     // Validate required fields
@@ -247,9 +268,15 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
       return
     }
 
-    // Staff availability is now allowed for the same booking
-    // This check has been removed to allow adding multiple services for the same staff
-    // in the same appointment (same client, same time slot)
+    // Check if staff is unavailable for OTHER appointments (not the current one)
+    if (unavailableStaff.includes(selectedStaff)) {
+      toast({
+        variant: "destructive",
+        title: "Staff unavailable",
+        description: "This staff member has a conflicting appointment with another client. Please select another staff member.",
+      })
+      return
+    }
 
     setIsSubmitting(true)
 
@@ -394,6 +421,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
             >
               <SelectTrigger
                 id="staff"
+                className={unavailableStaff.includes(selectedStaff) ? "border-red-500" : ""}
               >
                 <SelectValue placeholder={!selectedService ? "Select a service first" : "Select staff member"} />
               </SelectTrigger>
@@ -404,14 +432,16 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
                   </SelectItem>
                 ) : activeStaff.length > 0 ? (
                   activeStaff.map((staff) => {
-                    // Staff availability check removed for same booking
-                    // All active staff are now selectable
+                    const isUnavailable = unavailableStaff.includes(staff.id);
                     return (
                       <SelectItem
                         key={staff.id}
                         value={staff.id}
+                        className={isUnavailable ? "text-red-500 line-through" : ""}
+                        disabled={isUnavailable}
                       >
                         {getFirstName(staff.name)} - {(staff.role || "Staff").replace("_", " ")}
+                        {isUnavailable ? " (Unavailable)" : ""}
                       </SelectItem>
                     );
                   })
@@ -444,7 +474,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !selectedService || !selectedStaff}
+            disabled={isSubmitting || !selectedService || !selectedStaff || unavailableStaff.includes(selectedStaff)}
             className="bg-black text-white hover:bg-gray-800"
           >
             {isSubmitting ? "Adding..." : "Add Service"}
