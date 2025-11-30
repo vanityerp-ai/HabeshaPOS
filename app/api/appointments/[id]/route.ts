@@ -210,16 +210,12 @@ export async function PUT(
         mainServiceServiceId = currentAppointment.services[0]?.serviceId;
         const mainServiceId = currentAppointment.services[0]?.id;
 
-        if (hasNewAdditionalServices) {
-          console.log('🗑️ Deleting existing additional services (keeping main service)');
-          await prisma.appointmentService.deleteMany({
-            where: {
-              appointmentId: id,
-              id: { not: mainServiceId }
-            }
-          });
-        }
-
+        // NOTE: We DO NOT delete existing additional services anymore
+        // This was causing the bug where adding a second additional service
+        // would delete the first one. Instead, we just append new services.
+        
+        // However, we still delete and recreate products if new ones are being added
+        // because products are typically replaced as a set
         if (hasNewProducts) {
           console.log('🗑️ Deleting existing products');
           await prisma.appointmentProduct.deleteMany({
