@@ -79,30 +79,13 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
     const appointmentDate = parseISO(booking.date)
     const appointmentEndTime = addMinutes(appointmentDate, booking.duration)
 
-    // STRICT RULE: Check if this staff is already assigned to any service in this booking
-    // If staff is the main service provider, they are not available for the entire duration
-    // UNLESS they have completed their service
-    if (booking.staffId === staffId) {
-      // If the staff has completed their service, they are available
-      if (booking.staffServiceCompleted) {
-        return true
-      }
-      return false // Main service staff is not available if they haven't completed their service
-    }
-
-    // STRICT RULE: Check additional services for this staff
-    // If staff is assigned to any additional service, they are not available for the entire duration
-    // UNLESS they have completed their service
-    if (booking.additionalServices && booking.additionalServices.length > 0) {
-      const assignedService = booking.additionalServices.find((service: any) => service.staffId === staffId)
-      if (assignedService) {
-        // If the staff has completed their service, they are available
-        if (assignedService.completed) {
-          return true
-        }
-        return false // Staff is not available if they haven't completed their service
-      }
-    }
+    // MODIFIED RULE: Allow adding services for the same staff member in the same booking
+    // This enables staff to perform multiple services for the same client in one appointment
+    // Staff is considered available for the same booking, regardless of their current assignment
+    // The original strict rule prevented this, but it's a valid business case
+    
+    // Skip checks for the current booking - staff can have multiple services in same appointment
+    // We only check availability for OTHER appointments at the same time
 
     // Check other appointments for this staff at the same time
     // Get real appointments from localStorage
@@ -117,7 +100,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
     })();
 
     return !allAppointments.some((appointment: any) => {
-      // Skip the current booking
+      // IMPORTANT: Skip the current booking - allow staff to have multiple services in same appointment
       if (appointment.id === booking.id) return false
 
       // IMPORTANT: Skip completed appointments - they don't block staff availability
@@ -164,13 +147,11 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
     }
   }, [currentBooking, realStaff])
 
-  // Check if selected staff is already booked
+  // Staff warnings removed - staff can now have multiple services in the same booking
+  // This useEffect is kept for backwards compatibility but warning is disabled
   useEffect(() => {
-    if (selectedStaff && unavailableStaff.includes(selectedStaff)) {
-      setStaffWarning("This staff member is already assigned to a service during this time slot.")
-    } else {
-      setStaffWarning(null)
-    }
+    // No warning for same booking - staff can have multiple services
+    setStaffWarning(null)
   }, [selectedStaff, unavailableStaff])
 
   // Log available categories and services for debugging
@@ -266,15 +247,9 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
       return
     }
 
-    // Check if staff is unavailable
-    if (unavailableStaff.includes(selectedStaff)) {
-      toast({
-        variant: "destructive",
-        title: "Staff unavailable",
-        description: "This staff member is already assigned to a service during this time slot. Please select another staff member.",
-      })
-      return
-    }
+    // Staff availability is now allowed for the same booking
+    // This check has been removed to allow adding multiple services for the same staff
+    // in the same appointment (same client, same time slot)
 
     setIsSubmitting(true)
 
@@ -419,7 +394,6 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
             >
               <SelectTrigger
                 id="staff"
-                className={unavailableStaff.includes(selectedStaff) ? "border-red-500" : ""}
               >
                 <SelectValue placeholder={!selectedService ? "Select a service first" : "Select staff member"} />
               </SelectTrigger>
@@ -430,16 +404,14 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
                   </SelectItem>
                 ) : activeStaff.length > 0 ? (
                   activeStaff.map((staff) => {
-                    const isUnavailable = unavailableStaff.includes(staff.id);
+                    // Staff availability check removed for same booking
+                    // All active staff are now selectable
                     return (
                       <SelectItem
                         key={staff.id}
                         value={staff.id}
-                        className={isUnavailable ? "text-red-500 line-through" : ""}
-                        disabled={isUnavailable}
                       >
                         {getFirstName(staff.name)} - {(staff.role || "Staff").replace("_", " ")}
-                        {isUnavailable ? " (Unavailable)" : ""}
                       </SelectItem>
                     );
                   })
@@ -472,7 +444,7 @@ export function AddServiceDialog({ open, onOpenChange, bookingId, onServiceAdded
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !selectedService || !selectedStaff || unavailableStaff.includes(selectedStaff)}
+            disabled={isSubmitting || !selectedService || !selectedStaff}
             className="bg-black text-white hover:bg-gray-800"
           >
             {isSubmitting ? "Adding..." : "Add Service"}
